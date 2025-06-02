@@ -4,6 +4,7 @@ import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.IOException;
 
 import javax.naming.OperationNotSupportedException;
 
@@ -18,6 +19,12 @@ public class App {
 		}
 		BufferedReader reader = new BufferedReader(fReader);
 
+		try {
+			reader.close();
+		} catch (IOException e) {
+			System.err.printf("Hubo un error al cerrar el archivo: %s\n", e.getMessage());
+			return null;
+		}
 		throw new OperationNotSupportedException("No sé leer de un archivo");
 	}
 
