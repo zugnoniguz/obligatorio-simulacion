@@ -14,4 +14,12 @@ public class Configuracion {
 
 	// Indicador si existe sala reservada por emergencia.
 	public boolean existeSalaReservada;
+
+	public Configuracion(int cantInicialPacientes, int pacientesPorHora, InfoConsulta[] tiposConsulta,
+			boolean existeSalaReservada) {
+		this.cantInicialPacientes = cantInicialPacientes;
+		this.pacientesPorHora = pacientesPorHora;
+		this.tiposConsulta = tiposConsulta;
+		this.existeSalaReservada = existeSalaReservada;
+	}
 }

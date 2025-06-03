@@ -15,3 +15,5 @@
 !src/test/java/ucu/
 !src/test/java/ucu/slay
 !src/test/java/ucu/slay/*.java
+
+!simulacion-*.txt

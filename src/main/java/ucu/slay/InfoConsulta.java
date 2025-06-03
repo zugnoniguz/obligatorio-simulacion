@@ -12,4 +12,11 @@ public class InfoConsulta {
 
 	// Si es urgencia
 	public boolean esUrgencia;
+
+	public InfoConsulta(int duracion, String tipo, boolean esEmergencia, boolean esUrgencia) {
+		this.duracion = duracion;
+		this.tipo = tipo;
+		this.esEmergencia = esEmergencia;
+		this.esUrgencia = esUrgencia;
+	}
 }
