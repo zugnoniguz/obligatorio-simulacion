@@ -2,9 +2,8 @@ cantInicialPacientes = 6
 
 pacientesPorHora = 8
 
-consulta = 6,dermatología,false,false
-consulta = 4,pediatría,false,false
-consulta = 4,emergencia,true,false
-consulta = 4,bruh,false,true
+consulta = dermatología
+consulta = pediatría
+consulta = parto
 
 existeSalaReservada = false
