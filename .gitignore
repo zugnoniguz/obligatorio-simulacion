@@ -10,6 +10,8 @@
 !src/main/java/ucu/
 !src/main/java/ucu/slay
 !src/main/java/ucu/slay/*.java
+!src/main/java/ucu/utils
+!src/main/java/ucu/utils/*.java
 
 !src/test/
 !src/test/java/
