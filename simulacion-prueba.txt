@@ -1,3 +1,6 @@
+cantMedicos = 1
+cantEnfermeros = 1
+
 cantInicialPacientes = 6
 
 pacientesPorHora = 8

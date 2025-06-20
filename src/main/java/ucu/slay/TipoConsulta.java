@@ -53,4 +53,18 @@ public enum TipoConsulta {
 						String.format("No se sabe si %s es de emergencia o no\n", this.toString()));
 		}
 	}
+
+	public boolean esUrgencia() {
+		switch (this) {
+			case Dermatologia:
+				return false;
+			case Pediatria:
+				return true;
+			case Parto:
+				return false;
+			default:
+				throw new UnsupportedOperationException(
+						String.format("No se sabe si %s es de emergencia o no\n", this.toString()));
+		}
+	}
 }

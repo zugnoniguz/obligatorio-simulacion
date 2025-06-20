@@ -1,90 +1,117 @@
 package ucu.slay;
 
-import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Optional;
+import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
-import java.util.concurrent.locks.ReentrantLock;
 
 public class PlanificadorConsultas {
-	// Las emergencias no tienen prioridad. Las atendemos y listo.
-	private ArrayDeque<Paciente> consultasEmergencia;
-	// Traba para la cola de emergencias.
-	// Nota(guz): Que me la chupe synchronized.
-	private ReentrantLock lockConsultasEmergencia;
 
-	// Las urgencias tampoco tienen proridad entre sí.
-	private ArrayDeque<Paciente> consultasUrgencia;
-	// Traba para la cola de urgencias.
-	private ReentrantLock lockConsultasUrgencia;
+    private static final Hora horaInicial = new Hora(8, 0);
 
-	// Entre las consultas normales, tampoco hay prioridad.
-	//
-	// Las urgencias tendrían más prioridad, en teoría, pero sin embargo una vez que
-	// envejecen demasiado pasan a `consultasUrgencia`.
-	private ArrayDeque<Paciente> consultasNormales;
-	// Traba para la cola de consultas normales.
-	private ReentrantLock lockConsultasNormales;
+    private final Configuracion config;
 
-	private Semaphore cantidadPacientes;
+    // Las emergencias no tienen prioridad. Las atendemos y listo.
+    private final ArrayBlockingQueue<Paciente> consultasEmergencia;
 
-	public PlanificadorConsultas() {
-		this.consultasEmergencia = new ArrayDeque<>();
-		this.lockConsultasEmergencia = new ReentrantLock();
-		this.consultasUrgencia = new ArrayDeque<>();
-		this.lockConsultasUrgencia = new ReentrantLock();
-		this.consultasNormales = new ArrayDeque<>();
-		this.lockConsultasNormales = new ReentrantLock();
-		this.cantidadPacientes = new Semaphore(0);
-	}
+    // Las urgencias tampoco tienen proridad entre sí.
+    private final ArrayBlockingQueue<Paciente> consultasUrgenciaAlta;
+    private final ArrayBlockingQueue<Paciente> consultasUrgenciaBaja;
 
-	public void recibirPaciente(Paciente p) {
-		if (p.consultaDeseada.esEmergencia) {
-			this.lockConsultasEmergencia.lock();
-			this.consultasEmergencia.add(p);
-			this.lockConsultasEmergencia.unlock();
-		} else if (p.consultaDeseada.esUrgencia) {
-			this.lockConsultasUrgencia.lock();
-			this.consultasUrgencia.add(p);
-			this.lockConsultasUrgencia.unlock();
-		} else {
-			this.lockConsultasNormales.lock();
-			this.consultasNormales.add(p);
-			this.lockConsultasNormales.unlock();
-		}
-		this.cantidadPacientes.release();
-	}
+    // Entre las consultas normales, tampoco hay prioridad.
+    //
+    // Las urgencias tendrían más prioridad, en teoría, pero sin embargo una vez que
+    // envejecen demasiado pasan a `consultasUrgencia`.
+    private final ArrayBlockingQueue<Paciente> consultasNormales;
 
-	public Optional<Paciente> tomarPaciente() {
-		this.lockConsultasEmergencia.lock();
-		if (!this.consultasEmergencia.isEmpty()) {
-			this.lockConsultasEmergencia.unlock();
-			return Optional.of(this.consultasEmergencia.pop());
-		}
-		this.lockConsultasEmergencia.unlock();
+    private final Semaphore empezoElMinuto;
+    private final Semaphore terminoElMinuto;
 
-		this.lockConsultasUrgencia.lock();
-		if (!this.consultasUrgencia.isEmpty()) {
-			this.lockConsultasUrgencia.unlock();
-			return Optional.of(this.consultasUrgencia.pop());
-		}
-		this.lockConsultasUrgencia.unlock();
+    public PlanificadorConsultas(Configuracion config) {
+        this.config = config;
 
-		this.lockConsultasNormales.lock();
-		if (!this.consultasNormales.isEmpty()) {
-			this.lockConsultasNormales.unlock();
-			return Optional.of(this.consultasNormales.pop());
-		}
-		this.lockConsultasNormales.unlock();
+        int cap = config.pacientesPorHora * 2;
+        this.consultasEmergencia = new ArrayBlockingQueue<>(cap, true);
+        this.consultasUrgenciaAlta = new ArrayBlockingQueue<>(cap, true);
+        this.consultasUrgenciaBaja = new ArrayBlockingQueue<>(cap, true);
+        this.consultasNormales = new ArrayBlockingQueue<>(cap, true);
 
-		return Optional.empty();
-	}
+        this.empezoElMinuto = new Semaphore(0, true);
+        this.terminoElMinuto = new Semaphore(0, true);
+    }
 
-	public Paciente esperarPaciente() {
-		try {
-			this.cantidadPacientes.acquire();
-		} catch (InterruptedException e) {
-			System.err.println("No interrumpan al pana");
-		}
-		return this.tomarPaciente().orElseThrow();
-	}
+    public void correrSimulacion() {
+        ArrayList<Thread> medicos = new ArrayList<>();
+        ArrayList<Thread> enfermeros = new ArrayList<>();
+        int totalHilos = 0;
+
+        for (int i = 0; i < config.cantMedicos; ++i) {
+            medicos.add(new Thread(new Medico()));
+            totalHilos += 1;
+        }
+        for (int i = 0; i < config.cantEnfermeros; ++i) {
+            enfermeros.add(new Thread(new Enfermero()));
+            totalHilos += 1;
+        }
+
+        for (Hora hora = horaInicial; !hora.equals(new Hora(20, 0)); hora.increment()) {
+            System.out.printf("Hora: %d:%d\n", hora.hora, hora.min);
+            empezoElMinuto.release(totalHilos);
+
+            try {
+                terminoElMinuto.acquire(totalHilos);
+            } catch (InterruptedException e) {
+                System.err.printf("Me interrumpieron D: (%s)", e.getMessage());
+            }
+            
+            System.out.println();
+        }
+        // while (true) {
+        //     mando notificaciones
+        //     digo que empezo el minuto
+        //     espero a que todos terminen
+        //     avanzo el minuto
+        // }
+    }
+
+    public void recibirPaciente(Paciente p) {
+        if (p.consultaDeseada.esEmergencia()) {
+            this.consultasEmergencia.add(p);
+        } else if (p.consultaDeseada.esUrgencia()) {
+            this.consultasUrgenciaBaja.add(p);
+        } else {
+            this.consultasNormales.add(p);
+        }
+    }
+
+    public Optional<Paciente> tomarPaciente() {
+        Paciente p;
+        p = this.consultasEmergencia.poll();
+        if (p != null) {
+            return Optional.of(p);
+        }
+
+        p = this.consultasUrgenciaAlta.poll();
+        if (p != null) {
+            return Optional.of(p);
+        }
+
+        p = this.consultasUrgenciaBaja.poll();
+        if (p != null) {
+            return Optional.of(p);
+        }
+
+        p = this.consultasNormales.poll();
+        if (p != null) {
+            return Optional.of(p);
+        }
+
+        return Optional.empty();
+
+    }
+
+    public Paciente esperarPaciente() {
+        // TODO: Block until there is one
+        return this.tomarPaciente().orElseThrow();
+    }
 }
