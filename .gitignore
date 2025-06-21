@@ -5,18 +5,15 @@
 
 !src/
 
-!src/main/
-!src/main/java/
-!src/main/java/ucu/
-!src/main/java/ucu/slay
-!src/main/java/ucu/slay/*.java
-!src/main/java/ucu/utils
-!src/main/java/ucu/utils/*.java
+!src/ucu/
+!src/ucu/slay
+!src/ucu/slay/*.java
+!src/ucu/utils
+!src/ucu/utils/*.java
 
-!src/test/
-!src/test/java/
-!src/test/java/ucu/
-!src/test/java/ucu/slay
-!src/test/java/ucu/slay/*.java
+!test/
+!test/ucu/
+!test/ucu/slay
+!test/ucu/slay/*.java
 
 !simulacion-*.txt
