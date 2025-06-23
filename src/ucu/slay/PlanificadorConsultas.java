@@ -8,6 +8,7 @@ import java.util.concurrent.Semaphore;
 public class PlanificadorConsultas {
 
     private static final Hora horaInicial = new Hora(8, 0);
+    private static final Hora horaFinal = new Hora(20, 0);
 
     private final Configuracion config;
 
@@ -40,13 +41,16 @@ public class PlanificadorConsultas {
         this.terminoElMinuto = new Semaphore(0, true);
     }
 
-    public void correrSimulacion() {
+    public void correrSimulacion() throws InterruptedException {
         ArrayList<Thread> medicos = new ArrayList<>();
         ArrayList<Thread> enfermeros = new ArrayList<>();
+        ArrayBlockingQueue<ArrayList<Paciente>> colaPacientesInterrupcion = new ArrayBlockingQueue<>(2, true);
+        ArrayBlockingQueue<ArrayList<Paciente>> colaPacientesNormales = new ArrayBlockingQueue<>(2, true);
+
         int totalHilos = 0;
 
         for (int i = 0; i < config.cantMedicos; ++i) {
-            medicos.add(new Thread(new Medico()));
+            medicos.add(new Thread(new Medico(this.empezoElMinuto, this.terminoElMinuto, colaPacientesInterrupcion, colaPacientesNormales)));
             totalHilos += 1;
         }
         for (int i = 0; i < config.cantEnfermeros; ++i) {
@@ -54,24 +58,32 @@ public class PlanificadorConsultas {
             totalHilos += 1;
         }
 
-        for (Hora hora = horaInicial; !hora.equals(new Hora(20, 0)); hora.increment()) {
+        for (Hora hora = horaInicial; !hora.equals(horaFinal); hora.increment()) {
+            // mando notificaciones
+            // TODO
+            // agarrar a todos los pacientes y mandarlos por el "colapacientesinterrupcion" y "colapacientesnormales" y el pibe vera que saca
+
+            // digo que empezo el minuto
             System.out.printf("Hora: %d:%d\n", hora.hora, hora.min);
             empezoElMinuto.release(totalHilos);
 
-            try {
-                terminoElMinuto.acquire(totalHilos);
-            } catch (InterruptedException e) {
-                System.err.printf("Me interrumpieron D: (%s)", e.getMessage());
-            }
-            
+            // espero a que todos terminen
+            terminoElMinuto.acquire(totalHilos);
+
             System.out.println();
+
+            // avanzo el minuto (el for)
         }
-        // while (true) {
-        //     mando notificaciones
-        //     digo que empezo el minuto
-        //     espero a que todos terminen
-        //     avanzo el minuto
-        // }
+
+        for (Thread t : medicos) {
+            t.interrupt();
+            t.join();
+        }
+
+        for (Thread t : enfermeros) {
+            t.interrupt();
+            t.join();
+        }
     }
 
     public void recibirPaciente(Paciente p) {
@@ -111,7 +123,13 @@ public class PlanificadorConsultas {
     }
 
     public Paciente esperarPaciente() {
-        // TODO: Block until there is one
+        // TODO: Block until there is one 
         return this.tomarPaciente().orElseThrow();
+    }
+
+    public void Contact() {
+        if (!this.consultasUrgenciaAlta.isEmpty()) {
+
+        }
     }
 }
