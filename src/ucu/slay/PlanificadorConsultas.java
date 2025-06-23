@@ -1,7 +1,6 @@
 package ucu.slay;
 
 import java.util.ArrayList;
-import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
 
@@ -44,24 +43,40 @@ public class PlanificadorConsultas {
     public void correrSimulacion() throws InterruptedException {
         ArrayList<Thread> medicos = new ArrayList<>();
         ArrayList<Thread> enfermeros = new ArrayList<>();
-        ArrayBlockingQueue<ArrayList<Paciente>> colaPacientesInterrupcion = new ArrayBlockingQueue<>(2, true);
-        ArrayBlockingQueue<ArrayList<Paciente>> colaPacientesNormales = new ArrayBlockingQueue<>(2, true);
+        ArrayBlockingQueue<Paciente> colaPacientesInterrupcion = new ArrayBlockingQueue<>(2, true);
+        ArrayBlockingQueue<Paciente> colaPacientesNormales = new ArrayBlockingQueue<>(2, true);
 
         int totalHilos = 0;
 
         for (int i = 0; i < config.cantMedicos; ++i) {
-            medicos.add(new Thread(new Medico(this.empezoElMinuto, this.terminoElMinuto, colaPacientesInterrupcion, colaPacientesNormales)));
+            Thread t = new Thread(
+                    new Medico(i + 1,
+                            this.empezoElMinuto,
+                            this.terminoElMinuto,
+                            colaPacientesInterrupcion,
+                            colaPacientesNormales));
+            t.start();
+            medicos.add(t);
             totalHilos += 1;
         }
         for (int i = 0; i < config.cantEnfermeros; ++i) {
-            enfermeros.add(new Thread(new Enfermero()));
+            Thread t = new Thread(
+                    new Enfermero(i + 1,
+                            this.empezoElMinuto,
+                            this.terminoElMinuto));
+            t.start();
+            enfermeros.add(t);
             totalHilos += 1;
         }
 
         for (Hora hora = horaInicial; !hora.equals(horaFinal); hora.increment()) {
             // mando notificaciones
-            // TODO
-            // agarrar a todos los pacientes y mandarlos por el "colapacientesinterrupcion" y "colapacientesnormales" y el pibe vera que saca
+            colaPacientesInterrupcion.clear();
+            colaPacientesInterrupcion.addAll(this.consultasEmergencia);
+            colaPacientesInterrupcion.addAll(this.consultasUrgenciaAlta);
+            colaPacientesNormales.clear();
+            colaPacientesNormales.addAll(this.consultasUrgenciaBaja);
+            colaPacientesNormales.addAll(this.consultasNormales);
 
             // digo que empezo el minuto
             System.out.printf("Hora: %d:%d\n", hora.hora, hora.min);
@@ -93,43 +108,6 @@ public class PlanificadorConsultas {
             this.consultasUrgenciaBaja.add(p);
         } else {
             this.consultasNormales.add(p);
-        }
-    }
-
-    public Optional<Paciente> tomarPaciente() {
-        Paciente p;
-        p = this.consultasEmergencia.poll();
-        if (p != null) {
-            return Optional.of(p);
-        }
-
-        p = this.consultasUrgenciaAlta.poll();
-        if (p != null) {
-            return Optional.of(p);
-        }
-
-        p = this.consultasUrgenciaBaja.poll();
-        if (p != null) {
-            return Optional.of(p);
-        }
-
-        p = this.consultasNormales.poll();
-        if (p != null) {
-            return Optional.of(p);
-        }
-
-        return Optional.empty();
-
-    }
-
-    public Paciente esperarPaciente() {
-        // TODO: Block until there is one 
-        return this.tomarPaciente().orElseThrow();
-    }
-
-    public void Contact() {
-        if (!this.consultasUrgenciaAlta.isEmpty()) {
-
         }
     }
 }

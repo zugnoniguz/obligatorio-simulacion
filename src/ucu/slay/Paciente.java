@@ -5,4 +5,5 @@ public class Paciente {
 	public TipoConsulta consultaDeseada;
 
 	public int tiempoRestante = -1;
+	public int tiempoDesdeLlegada = -1;
 }
