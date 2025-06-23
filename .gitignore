@@ -2,6 +2,7 @@
 
 !Justfile
 !pom.xml
+!.editorconfig
 
 !src/
 
