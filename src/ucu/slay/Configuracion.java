@@ -6,8 +6,9 @@ import ucu.utils.FileUtils;
 
 // El programa debe recibir por pantalla los datos necesarios para la simulación.
 public class Configuracion {
-    // Número inicial de pacientes a la hora 8:00.
+    public int semilla;
 
+    // Número inicial de pacientes a la hora 8:00.
     public int cantInicialPacientes;
 
     // Cantidad de pacientes que llegan por hora y motivo por el que vienen.
@@ -21,8 +22,15 @@ public class Configuracion {
     public int cantMedicos;
     public int cantEnfermeros;
 
-    public Configuracion(int cantInicialPacientes, int pacientesPorHora, TipoConsulta[] tiposConsulta,
-            boolean existeSalaReservada, int cantMedicos, int cantEnfermeros) {
+    public Configuracion(
+            int semilla,
+            int cantInicialPacientes,
+            int pacientesPorHora,
+            TipoConsulta[] tiposConsulta,
+            boolean existeSalaReservada,
+            int cantMedicos,
+            int cantEnfermeros) {
+        this.semilla = semilla;
         this.cantInicialPacientes = cantInicialPacientes;
         this.pacientesPorHora = pacientesPorHora;
         this.tiposConsulta = tiposConsulta;
@@ -34,6 +42,7 @@ public class Configuracion {
     public static Configuracion readFromFile(String fpath) {
         String[] lines = FileUtils.readFileAsLines(fpath);
 
+        Integer semilla = null;
         Integer cantInicialPacientes = null;
         Integer pacientesPorHora = null;
         ArrayList<TipoConsulta> consultas = null;
@@ -54,6 +63,13 @@ public class Configuracion {
             String name = line.substring(0, idx);
             String rest = line.substring(line.indexOf("=") + 1);
             switch (name.trim()) {
+                case "semilla" -> {
+                    if (semilla != null) {
+                        System.err.printf("Valor duplicado de semilla, ignorando\n");
+                        continue;
+                    }
+                    semilla = Integer.valueOf(rest.trim());
+                }
                 case "cantInicialPacientes" -> {
                     if (cantInicialPacientes != null) {
                         System.err.printf("Valor duplicado de cantInicialPacientes, ignorando\n");
@@ -103,6 +119,11 @@ public class Configuracion {
             }
         }
 
+        if (semilla == null) {
+            System.err.println("Falto semilla");
+            return null;
+        }
+
         if (cantInicialPacientes == null) {
             System.err.println("Falto cantInicialPacientes");
             return null;
@@ -113,27 +134,28 @@ public class Configuracion {
             return null;
         }
 
-		if (consultas == null) {
-			System.err.println("Falto consultas");
-			return null;
-		}
+        if (consultas == null) {
+            System.err.println("Falto consultas");
+            return null;
+        }
 
-		if (existeSalaReservada == null) {
-			System.err.println("Falto existeSalaReservada");
-			return null;
-		}
+        if (existeSalaReservada == null) {
+            System.err.println("Falto existeSalaReservada");
+            return null;
+        }
 
-		if (cantMedicos == null) {
-			System.err.println("Falto cantMedicos");
-			return null;
-		}
+        if (cantMedicos == null) {
+            System.err.println("Falto cantMedicos");
+            return null;
+        }
 
-		if (cantEnfermeros == null) {
-			System.err.println("Falto cantEnfermeros");
-			return null;
-		}
+        if (cantEnfermeros == null) {
+            System.err.println("Falto cantEnfermeros");
+            return null;
+        }
 
         return new Configuracion(
+                semilla,
                 cantInicialPacientes,
                 pacientesPorHora,
                 consultas.toArray(TipoConsulta[]::new),

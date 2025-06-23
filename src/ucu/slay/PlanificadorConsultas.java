@@ -1,6 +1,7 @@
 package ucu.slay;
 
 import java.util.ArrayList;
+import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
 
@@ -48,6 +49,14 @@ public class PlanificadorConsultas {
 
         int totalHilos = 0;
 
+        Thread hiloGenerador = new Thread(
+                new GeneradorPacientes(
+                        this.empezoElMinuto,
+                        this.terminoElMinuto,
+                        config.semilla));
+        hiloGenerador.start();
+        totalHilos += 1;
+
         for (int i = 0; i < config.cantMedicos; ++i) {
             Thread t = new Thread(
                     new Medico(i + 1,
@@ -69,6 +78,7 @@ public class PlanificadorConsultas {
             totalHilos += 1;
         }
 
+        System.out.printf("[PlanificadorConsultas] Empezando la simulación con %d hilos\n", totalHilos);
         for (Hora hora = horaInicial; !hora.equals(horaFinal); hora.increment()) {
             // mando notificaciones
             colaPacientesInterrupcion.clear();
@@ -79,17 +89,20 @@ public class PlanificadorConsultas {
             colaPacientesNormales.addAll(this.consultasNormales);
 
             // digo que empezo el minuto
-            System.out.printf("Hora: %d:%d\n", hora.hora, hora.min);
+            System.out.printf("[PlanificadorConsultas] Hora: %d:%d\n", hora.hora, hora.min);
             empezoElMinuto.release(totalHilos);
 
             // espero a que todos terminen
             terminoElMinuto.acquire(totalHilos);
+            System.out.printf("[PlanificadorConsultas] Terminó el minuto %d:%d\n", hora.hora, hora.min);
 
             System.out.println();
 
             // avanzo el minuto (el for)
         }
 
+        hiloGenerador.interrupt();
+        hiloGenerador.join();
         for (Thread t : medicos) {
             t.interrupt();
             t.join();

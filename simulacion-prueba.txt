@@ -1,3 +1,5 @@
+semilla = 69420
+
 cantMedicos = 1
 cantEnfermeros = 1
 
