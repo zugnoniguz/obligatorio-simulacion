@@ -1,4 +1,4 @@
-package ucu.slay;
+package ucu.utils;
 
 public class Hora {
 

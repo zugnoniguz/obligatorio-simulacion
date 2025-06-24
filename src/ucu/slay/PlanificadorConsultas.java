@@ -5,6 +5,8 @@ import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
 
+import ucu.utils.Hora;
+
 public class PlanificadorConsultas {
 
     private static final Hora horaInicial = new Hora(8, 0);
