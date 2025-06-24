@@ -1,7 +1,6 @@
 package ucu.slay;
 
 import java.util.ArrayList;
-import java.util.Random;
 import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.Semaphore;
 
@@ -27,9 +26,6 @@ public class PlanificadorConsultas {
     // envejecen demasiado pasan a `consultasUrgencia`.
     private final ArrayBlockingQueue<Paciente> consultasNormales;
 
-    private final Semaphore empezoElMinuto;
-    private final Semaphore terminoElMinuto;
-
     public PlanificadorConsultas(Configuracion config) {
         this.config = config;
 
@@ -38,47 +34,100 @@ public class PlanificadorConsultas {
         this.consultasUrgenciaAlta = new ArrayBlockingQueue<>(cap, true);
         this.consultasUrgenciaBaja = new ArrayBlockingQueue<>(cap, true);
         this.consultasNormales = new ArrayBlockingQueue<>(cap, true);
-
-        this.empezoElMinuto = new Semaphore(0, true);
-        this.terminoElMinuto = new Semaphore(0, true);
     }
 
-    public void correrSimulacion() throws InterruptedException {
+    class InitResult {
+        int totalHilos;
+        Thread[] medicos;
+        Thread[] enfermeros;
+        Thread generadorPacientes;
+        ArrayBlockingQueue<Paciente> colaPacientesInterrupcion;
+        ArrayBlockingQueue<Paciente> colaPacientesNormales;
+        Semaphore empezoElMinuto;
+        Semaphore terminoElMinuto;
+
+        public InitResult(
+                int totalHilos,
+                Thread[] medicos,
+                Thread[] enfermeros,
+                Thread generadorPacientes,
+                ArrayBlockingQueue<Paciente> colaPacientesInterrupcion,
+                ArrayBlockingQueue<Paciente> colaPacientesNormales,
+                Semaphore empezoElMinuto,
+                Semaphore terminoElMinuto) {
+            this.totalHilos = totalHilos;
+            this.medicos = medicos;
+            this.enfermeros = enfermeros;
+            this.generadorPacientes = generadorPacientes;
+            this.colaPacientesInterrupcion = colaPacientesInterrupcion;
+            this.colaPacientesNormales = colaPacientesNormales;
+            this.empezoElMinuto = empezoElMinuto;
+            this.terminoElMinuto = terminoElMinuto;
+        }
+    }
+
+    private InitResult initSimulacion() {
         ArrayList<Thread> medicos = new ArrayList<>();
         ArrayList<Thread> enfermeros = new ArrayList<>();
-        ArrayBlockingQueue<Paciente> colaPacientesInterrupcion = new ArrayBlockingQueue<>(2, true);
         ArrayBlockingQueue<Paciente> colaPacientesNormales = new ArrayBlockingQueue<>(2, true);
+        ArrayBlockingQueue<Paciente> colaPacientesInterrupcion = new ArrayBlockingQueue<>(2, true);
 
         int totalHilos = 0;
+        totalHilos += 1; // GeneradorPacientes
+        totalHilos += config.cantMedicos;
+        totalHilos += config.cantEnfermeros;
+
+        Semaphore empezoElMinuto = new Semaphore(0, true);
+        Semaphore terminoElMinuto = new Semaphore(0, true);
 
         Thread hiloGenerador = new Thread(
                 new GeneradorPacientes(
-                        this.empezoElMinuto,
-                        this.terminoElMinuto,
+                        empezoElMinuto,
+                        terminoElMinuto,
                         config.semilla));
         hiloGenerador.start();
-        totalHilos += 1;
 
         for (int i = 0; i < config.cantMedicos; ++i) {
             Thread t = new Thread(
                     new Medico(i + 1,
-                            this.empezoElMinuto,
-                            this.terminoElMinuto,
+                            empezoElMinuto,
+                            terminoElMinuto,
                             colaPacientesInterrupcion,
                             colaPacientesNormales));
             t.start();
             medicos.add(t);
-            totalHilos += 1;
         }
         for (int i = 0; i < config.cantEnfermeros; ++i) {
             Thread t = new Thread(
                     new Enfermero(i + 1,
-                            this.empezoElMinuto,
-                            this.terminoElMinuto));
+                            empezoElMinuto,
+                            terminoElMinuto));
             t.start();
             enfermeros.add(t);
-            totalHilos += 1;
         }
+
+        return new InitResult(
+                totalHilos,
+                medicos.toArray(new Thread[0]),
+                enfermeros.toArray(new Thread[0]),
+                hiloGenerador,
+                colaPacientesInterrupcion,
+                colaPacientesNormales,
+                empezoElMinuto,
+                terminoElMinuto);
+    }
+
+    public void correrSimulacion() throws InterruptedException {
+        var result = this.initSimulacion();
+
+        var totalHilos = result.totalHilos;
+        var colaPacientesInterrupcion = result.colaPacientesInterrupcion;
+        var colaPacientesNormales = result.colaPacientesNormales;
+        var empezoElMinuto = result.empezoElMinuto;
+        var terminoElMinuto = result.terminoElMinuto;
+        var generadorPacientes = result.generadorPacientes;
+        var medicos = result.medicos;
+        var enfermeros = result.medicos;
 
         System.out.printf("[PlanificadorConsultas] Empezando la simulación con %d hilos\n", totalHilos);
         for (Hora hora = horaInicial; !hora.equals(horaFinal); hora.increment()) {
@@ -92,6 +141,9 @@ public class PlanificadorConsultas {
 
             // digo que empezo el minuto
             System.out.printf("[PlanificadorConsultas] Hora: %d:%d\n", hora.hora, hora.min);
+            // FIXME: esto no espera a que todos terminen. como el hilo no puede esperar a
+            // que todos terminen para seguir, puede pasar que un mismo hilo empieze el
+            // minuto dos veces
             empezoElMinuto.release(totalHilos);
 
             // espero a que todos terminen
@@ -103,8 +155,8 @@ public class PlanificadorConsultas {
             // avanzo el minuto (el for)
         }
 
-        hiloGenerador.interrupt();
-        hiloGenerador.join();
+        generadorPacientes.interrupt();
+        generadorPacientes.join();
         for (Thread t : medicos) {
             t.interrupt();
             t.join();
