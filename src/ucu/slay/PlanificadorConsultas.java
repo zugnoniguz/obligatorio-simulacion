@@ -13,7 +13,7 @@ public class PlanificadorConsultas {
     private static final Hora horaInicial = new Hora(8, 0);
     private static final Hora horaFinal = new Hora(20, 0);
 
-    private final Configuracion config;
+    public final Configuracion config;
 
     // Las emergencias no tienen prioridad. Las atendemos y listo.
     private final ArrayBlockingQueue<Paciente> consultasEmergencia;
@@ -31,6 +31,7 @@ public class PlanificadorConsultas {
     public final Semaphore empezoElMinuto;
     public final Semaphore terminoElMinuto;
     public CyclicBarrier terminaronTodos;
+    public Hora horaActual;
 
     public PlanificadorConsultas(Configuracion config) {
         this.config = config;
@@ -105,14 +106,15 @@ public class PlanificadorConsultas {
         var enfermeros = result.medicos;
 
         System.out.printf("[PlanificadorConsultas] Empezando la simulación con %d hilos\n", totalHilos);
-        for (Hora hora = horaInicial; !hora.equals(horaFinal); hora.increment()) {
+        for (this.horaActual = horaInicial; !this.horaActual.equals(horaFinal); this.horaActual.increment()) {
             // digo que empezo el minuto
-            System.out.printf("[PlanificadorConsultas] Hora: %02d:%02d\n", hora.hora, hora.min);
+            System.out.printf("[PlanificadorConsultas] Hora: %02d:%02d\n", this.horaActual.hora, this.horaActual.min);
             this.empezoElMinuto.release(totalHilos);
 
             // espero a que todos terminen
             this.terminoElMinuto.acquire(totalHilos);
-            System.out.printf("[PlanificadorConsultas] Terminó el minuto %d:%d\n", hora.hora, hora.min);
+            System.out.printf("[PlanificadorConsultas] Terminó el minuto %02d:%02d\n", this.horaActual.hora,
+                    this.horaActual.min);
             int n = this.terminaronTodos.getNumberWaiting();
             if (n != 0) {
                 System.err.printf("[PlanificadorConsultas] Terminaron %d hilos pero %d esperan para seguir\n",
@@ -137,6 +139,9 @@ public class PlanificadorConsultas {
         }
     }
 
+    // TODO: Informar que puede estar llena y capaz trackear como resultado cuantos
+    // pacientes no pueden entrar en la sala
+    // de espera
     public void recibirPaciente(Paciente p) {
         if (p.consultaDeseada.esEmergencia()) {
             this.consultasEmergencia.add(p);

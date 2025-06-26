@@ -30,6 +30,18 @@ public enum TipoConsulta {
         }
     }
 
+    private static TipoConsulta[] variantArray() {
+        return TipoConsulta.class.getEnumConstants();
+    }
+
+    public static int getCount() {
+        return TipoConsulta.variantArray().length;
+    }
+
+    public static TipoConsulta fromIdx(int idx) {
+        return TipoConsulta.variantArray()[idx];
+    }
+
     private final static HashMap<TipoConsulta, Integer> horarios = new HashMap<>(
             Map.ofEntries(
                     Map.entry(TipoConsulta.Dermatologia, 5),
