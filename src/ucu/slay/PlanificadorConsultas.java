@@ -1,7 +1,9 @@
 package ucu.slay;
 
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Semaphore;
 
 import ucu.utils.Hora;
@@ -26,6 +28,10 @@ public class PlanificadorConsultas {
     // envejecen demasiado pasan a `consultasUrgencia`.
     private final ArrayBlockingQueue<Paciente> consultasNormales;
 
+    public final Semaphore empezoElMinuto;
+    public final Semaphore terminoElMinuto;
+    public CyclicBarrier terminaronTodos;
+
     public PlanificadorConsultas(Configuracion config) {
         this.config = config;
 
@@ -34,6 +40,9 @@ public class PlanificadorConsultas {
         this.consultasUrgenciaAlta = new ArrayBlockingQueue<>(cap, true);
         this.consultasUrgenciaBaja = new ArrayBlockingQueue<>(cap, true);
         this.consultasNormales = new ArrayBlockingQueue<>(cap, true);
+
+        this.empezoElMinuto = new Semaphore(0, true);
+        this.terminoElMinuto = new Semaphore(0, true);
     }
 
     class InitResult {
@@ -41,114 +50,74 @@ public class PlanificadorConsultas {
         Thread[] medicos;
         Thread[] enfermeros;
         Thread generadorPacientes;
-        ArrayBlockingQueue<Paciente> colaPacientesInterrupcion;
-        ArrayBlockingQueue<Paciente> colaPacientesNormales;
-        Semaphore empezoElMinuto;
-        Semaphore terminoElMinuto;
 
         public InitResult(
                 int totalHilos,
                 Thread[] medicos,
                 Thread[] enfermeros,
-                Thread generadorPacientes,
-                ArrayBlockingQueue<Paciente> colaPacientesInterrupcion,
-                ArrayBlockingQueue<Paciente> colaPacientesNormales,
-                Semaphore empezoElMinuto,
-                Semaphore terminoElMinuto) {
+                Thread generadorPacientes) {
             this.totalHilos = totalHilos;
             this.medicos = medicos;
             this.enfermeros = enfermeros;
             this.generadorPacientes = generadorPacientes;
-            this.colaPacientesInterrupcion = colaPacientesInterrupcion;
-            this.colaPacientesNormales = colaPacientesNormales;
-            this.empezoElMinuto = empezoElMinuto;
-            this.terminoElMinuto = terminoElMinuto;
         }
     }
 
     private InitResult initSimulacion() {
         ArrayList<Thread> medicos = new ArrayList<>();
         ArrayList<Thread> enfermeros = new ArrayList<>();
-        ArrayBlockingQueue<Paciente> colaPacientesNormales = new ArrayBlockingQueue<>(2, true);
-        ArrayBlockingQueue<Paciente> colaPacientesInterrupcion = new ArrayBlockingQueue<>(2, true);
 
         int totalHilos = 0;
-        totalHilos += 1; // GeneradorPacientes
-        totalHilos += config.cantMedicos;
-        totalHilos += config.cantEnfermeros;
 
-        Semaphore empezoElMinuto = new Semaphore(0, true);
-        Semaphore terminoElMinuto = new Semaphore(0, true);
-
-        Thread hiloGenerador = new Thread(
-                new GeneradorPacientes(
-                        empezoElMinuto,
-                        terminoElMinuto,
-                        config.semilla));
+        Thread hiloGenerador = new Thread(new GeneradorPacientes(config.semilla, this));
         hiloGenerador.start();
+        totalHilos += 1;
 
         for (int i = 0; i < config.cantMedicos; ++i) {
-            Thread t = new Thread(
-                    new Medico(i + 1,
-                            empezoElMinuto,
-                            terminoElMinuto,
-                            colaPacientesInterrupcion,
-                            colaPacientesNormales));
+            Thread t = new Thread(new Medico(i + 1, this));
             t.start();
             medicos.add(t);
+            totalHilos += config.cantMedicos;
         }
+
         for (int i = 0; i < config.cantEnfermeros; ++i) {
-            Thread t = new Thread(
-                    new Enfermero(i + 1,
-                            empezoElMinuto,
-                            terminoElMinuto));
+            Thread t = new Thread(new Enfermero(i + 1, this));
             t.start();
             enfermeros.add(t);
+            totalHilos += config.cantEnfermeros;
         }
+
+        this.terminaronTodos = new CyclicBarrier(totalHilos);
 
         return new InitResult(
                 totalHilos,
                 medicos.toArray(new Thread[0]),
                 enfermeros.toArray(new Thread[0]),
-                hiloGenerador,
-                colaPacientesInterrupcion,
-                colaPacientesNormales,
-                empezoElMinuto,
-                terminoElMinuto);
+                hiloGenerador);
     }
 
     public void correrSimulacion() throws InterruptedException {
         var result = this.initSimulacion();
 
         var totalHilos = result.totalHilos;
-        var colaPacientesInterrupcion = result.colaPacientesInterrupcion;
-        var colaPacientesNormales = result.colaPacientesNormales;
-        var empezoElMinuto = result.empezoElMinuto;
-        var terminoElMinuto = result.terminoElMinuto;
         var generadorPacientes = result.generadorPacientes;
         var medicos = result.medicos;
         var enfermeros = result.medicos;
 
         System.out.printf("[PlanificadorConsultas] Empezando la simulación con %d hilos\n", totalHilos);
         for (Hora hora = horaInicial; !hora.equals(horaFinal); hora.increment()) {
-            // mando notificaciones
-            colaPacientesInterrupcion.clear();
-            colaPacientesInterrupcion.addAll(this.consultasEmergencia);
-            colaPacientesInterrupcion.addAll(this.consultasUrgenciaAlta);
-            colaPacientesNormales.clear();
-            colaPacientesNormales.addAll(this.consultasUrgenciaBaja);
-            colaPacientesNormales.addAll(this.consultasNormales);
-
             // digo que empezo el minuto
-            System.out.printf("[PlanificadorConsultas] Hora: %d:%d\n", hora.hora, hora.min);
-            // FIXME: esto no espera a que todos terminen. como el hilo no puede esperar a
-            // que todos terminen para seguir, puede pasar que un mismo hilo empieze el
-            // minuto dos veces
-            empezoElMinuto.release(totalHilos);
+            System.out.printf("[PlanificadorConsultas] Hora: %02d:%02d\n", hora.hora, hora.min);
+            this.empezoElMinuto.release(totalHilos);
 
             // espero a que todos terminen
-            terminoElMinuto.acquire(totalHilos);
+            this.terminoElMinuto.acquire(totalHilos);
             System.out.printf("[PlanificadorConsultas] Terminó el minuto %d:%d\n", hora.hora, hora.min);
+            int n = this.terminaronTodos.getNumberWaiting();
+            if (n != 0) {
+                System.err.printf("[PlanificadorConsultas] Terminaron %d hilos pero %d esperan para seguir\n",
+                        totalHilos, n);
+            }
 
             System.out.println();
 
@@ -176,5 +145,34 @@ public class PlanificadorConsultas {
         } else {
             this.consultasNormales.add(p);
         }
+    }
+
+    public Optional<Paciente> conseguirPacienteInterruptor() {
+        Paciente pEmergencia = this.consultasEmergencia.poll();
+        if (pEmergencia != null) {
+            return Optional.of(pEmergencia);
+        }
+
+        Paciente pUrgenciaAlta = this.consultasUrgenciaAlta.poll();
+        if (pUrgenciaAlta != null) {
+            return Optional.of(pUrgenciaAlta);
+        }
+
+        Paciente pUrgenciaBaja = this.consultasUrgenciaBaja.poll();
+        if (pUrgenciaBaja != null) {
+            return Optional.of(pUrgenciaBaja);
+        }
+
+        return Optional.empty();
+    }
+
+    public boolean hayPacienteNormal() {
+        Paciente p = this.consultasNormales.poll();
+        return p != null;
+    }
+
+    public void aumentarPrioridadUrgencia(Paciente p) {
+        this.consultasUrgenciaBaja.remove(p);
+        this.consultasUrgenciaAlta.add(p);
     }
 }

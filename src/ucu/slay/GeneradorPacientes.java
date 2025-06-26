@@ -1,31 +1,30 @@
 package ucu.slay;
 
 import java.util.Random;
-import java.util.concurrent.Semaphore;
+import java.util.concurrent.BrokenBarrierException;
 
 public class GeneradorPacientes implements Runnable {
     private int semilla;
     private Random random;
-    private Semaphore empezoElMinuto;
-    private Semaphore terminoElMinuto;
+    private PlanificadorConsultas planificador;
 
-    public GeneradorPacientes(Semaphore empezoElMinuto, Semaphore terminoElMinuto, int semilla) {
-        this.empezoElMinuto = empezoElMinuto;
-        this.terminoElMinuto = terminoElMinuto;
+    public GeneradorPacientes(int semilla, PlanificadorConsultas planificador) {
+        this.planificador = planificador;
 
         this.semilla = semilla;
         this.random = new Random(this.semilla);
     }
 
-    public void runPosta() throws InterruptedException {
+    public void runPosta() throws BrokenBarrierException, InterruptedException {
         while (true) {
-            this.empezoElMinuto.acquire();
+            this.planificador.empezoElMinuto.acquire();
 
             if (this.random.nextBoolean()) {
                 System.out.println("[GeneradorPacientes] bruh");
             }
 
-            this.terminoElMinuto.release();
+            this.planificador.terminaronTodos.await();
+            this.planificador.terminoElMinuto.release();
         }
     }
 
@@ -35,6 +34,8 @@ public class GeneradorPacientes implements Runnable {
             runPosta();
         } catch (InterruptedException e) {
             System.err.printf("[GeneradorPacientes] Me interrumpieron D: (%s)\n", e.getMessage());
+        } catch (BrokenBarrierException e) {
+            System.err.printf("[GeneradorPacientes] Barrera rota D: (%s)\n", e.getMessage());
         }
 
     }

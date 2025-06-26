@@ -1,41 +1,66 @@
 package ucu.slay;
 
 import java.util.ArrayList;
+import java.util.Optional;
 import java.util.concurrent.ArrayBlockingQueue;
+import java.util.concurrent.BrokenBarrierException;
 import java.util.concurrent.Semaphore;
 
 public class Medico implements Runnable {
 
     private final int id;
-    private final Semaphore empezoElMinuto;
-    private final Semaphore terminoElMinuto;
-    private final ArrayBlockingQueue<Paciente> colaPacientesInterrupcion;
-    private final ArrayBlockingQueue<Paciente> colaPacientesNormales;
+    private final PlanificadorConsultas planificador;
 
     private Paciente pacienteActual;
 
     public Medico(
             int id,
-            Semaphore start,
-            Semaphore end,
-            ArrayBlockingQueue<Paciente> colaPacientesInterrupcion,
-            ArrayBlockingQueue<Paciente> colaPacientesNormales) {
+            PlanificadorConsultas planificador) {
         this.id = id;
-        this.colaPacientesInterrupcion = colaPacientesInterrupcion;
-        this.colaPacientesNormales = colaPacientesNormales;
-        this.empezoElMinuto = start;
-        this.terminoElMinuto = end;
+        this.planificador = planificador;
+    }
+
+    private void runPosta() throws BrokenBarrierException, InterruptedException {
+        while (true) {
+            // esperar a que avance el minuto
+            this.planificador.empezoElMinuto.acquire();
+            System.out.printf("[Médico %d] Empezando el minuto\n", this.id);
+
+            // me fijo que notificaciones hay (y hago lo que corresponda si pasa)
+            // this.conseguirPacienteNuevoSiCorresponde();
+
+            // hago lo que tengo que hacer
+            if (this.pacienteActual != null) {
+                this.atenderPaciente();
+            }
+
+            // y aviso que termine
+            System.out.printf("[Médico %d] Terminando el minuto\n", this.id);
+            this.planificador.terminaronTodos.await();
+            this.planificador.terminoElMinuto.release();
+        }
+    }
+
+    @Override
+    public void run() {
+        try {
+            runPosta();
+        } catch (InterruptedException e) {
+            System.err.printf("[Medico %d] Me interrumpieron D: (%s)\n", this.id, e.getMessage());
+        } catch (BrokenBarrierException e) {
+            System.err.printf("[Medico %d] Barrera rota D: (%s)\n", this.id, e.getMessage());
+        }
     }
 
     private void conseguirPacienteNuevoSiCorresponde() throws InterruptedException {
         if (this.pacienteActual == null) {
-            Paciente p = this.colaPacientesInterrupcion.poll();
-            if (p != null) {
-                this.pacienteActual = p;
+            Optional<Paciente> p = this.planificador.conseguirPacienteInterruptor();
+            if (p.isPresent()) {
+                this.pacienteActual = p.orElseThrow();
             } else {
-                p = this.colaPacientesNormales.poll();
-                if (p != null) {
-                    this.pacienteActual = p;
+                p = this.planificador.conseguirPacienteNormal();
+                if (p.isPresent()) {
+                    this.pacienteActual = p.orElseThrow();
                 }
             }
 
@@ -53,8 +78,8 @@ public class Medico implements Runnable {
             // Solo me importa si hay pacientes nuevos si ya no estoy atendiendo una
             // emergencia
 
-            Paciente p = colaPacientesInterrupcion.poll();
-            if (p != null) {
+            Optional<Paciente> p = this.planificador.conseguirPacienteInterruptor();
+            if (p.isPresent()) {
                 // devuelvoPacienteASalaDeEspera(pacienteActual);
                 // loEstoyAtendiendo(pacienteActual);
 
@@ -72,34 +97,4 @@ public class Medico implements Runnable {
             pacienteActual = null;
         }
     }
-
-    private void runPosta() throws InterruptedException {
-        while (true) {
-            // esperar a que avance el minuto
-            this.empezoElMinuto.acquire();
-            System.out.printf("[Médico %d] Empezando el minuto\n", this.id);
-
-            // me fijo que notificaciones hay (y hago lo que corresponda si pasa)
-            this.conseguirPacienteNuevoSiCorresponde();
-
-            // hago lo que tengo que hacer
-            if (this.pacienteActual != null) {
-                this.atenderPaciente();
-            }
-
-            // y aviso que termine
-            System.out.printf("[Médico %d] Terminando el minuto\n", this.id);
-            this.terminoElMinuto.release();
-        }
-    }
-
-    @Override
-    public void run() {
-        try {
-            runPosta();
-        } catch (InterruptedException e) {
-            System.err.printf("[Medico %d] Me interrumpieron D: (%s)\n", this.id, e.getMessage());
-        }
-    }
-
 }
