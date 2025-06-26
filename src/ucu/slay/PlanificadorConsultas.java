@@ -10,8 +10,8 @@ import ucu.utils.Hora;
 
 public class PlanificadorConsultas {
 
-    private static final Hora horaInicial = new Hora(8, 0);
-    private static final Hora horaFinal = new Hora(20, 0);
+    private static final Hora HORA_INICIAL = new Hora(8, 0);
+    private static final Hora HORA_FINAL = new Hora(20, 0);
 
     public final Configuracion config;
 
@@ -106,7 +106,7 @@ public class PlanificadorConsultas {
         var enfermeros = result.medicos;
 
         System.out.printf("[PlanificadorConsultas] Empezando la simulación con %d hilos\n", totalHilos);
-        for (this.horaActual = horaInicial; !this.horaActual.equals(horaFinal); this.horaActual.increment()) {
+        for (this.horaActual = HORA_INICIAL; !this.horaActual.equals(HORA_FINAL); this.horaActual.increment()) {
             // digo que empezo el minuto
             System.out.printf("[PlanificadorConsultas] Hora: %02d:%02d\n", this.horaActual.hora, this.horaActual.min);
             this.empezoElMinuto.release(totalHilos);
