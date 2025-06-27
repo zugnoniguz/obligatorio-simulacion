@@ -3,6 +3,8 @@ package ucu.slay;
 import java.util.Random;
 import java.util.concurrent.BrokenBarrierException;
 
+import ucu.utils.Hora;
+
 public class GeneradorPacientes implements Runnable {
     // Should be in [0,1]
     private static final double MAX_TIME_VARIANCE = 0.5;
@@ -37,7 +39,7 @@ public class GeneradorPacientes implements Runnable {
 
             if (this.planificador.horaActual.min == 0) {
                 for (int i = 0; i < mins.length; ++i) {
-                    mins[i] = this.random.nextInt(0, 60);
+                    mins[i] = this.random.nextInt(0, Hora.MAX_MIN);
                 }
             }
 
@@ -62,14 +64,19 @@ public class GeneradorPacientes implements Runnable {
         double variance = this.random.nextDouble(-MAX_TIME_VARIANCE, MAX_TIME_VARIANCE);
         p.tiempoRestante += p.tiempoRestante * variance;
 
+        char nivel = '%';
         if (p.consultaDeseada.esEmergencia()) {
-            System.out.printf("[GeneradorPacientes] Generando paciente (E) %dmin\n", p.tiempoRestante);
+            nivel = 'E';
         } else if (p.consultaDeseada.esUrgencia()) {
-            System.out.printf("[GeneradorPacientes] Generando paciente (U) %dmin\n", p.tiempoRestante);
+            nivel = 'U';
         } else {
-            System.out.printf("[GeneradorPacientes] Generando paciente (N) %dmin\n", p.tiempoRestante);
+            nivel = 'N';
         }
+
+        System.out.printf("[GeneradorPacientes] Generando paciente (%c) %dmin\n", nivel, p.tiempoRestante);
+        this.planificador.trancarColas();
         this.planificador.recibirPaciente(p);
+        this.planificador.destrancarColas();
     }
 
     @Override

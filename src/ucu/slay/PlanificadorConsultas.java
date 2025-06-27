@@ -116,12 +116,17 @@ public class PlanificadorConsultas {
         // TODO: Si estoy atendiendo gente sigo
         for (this.horaActual = HORA_INICIAL; !this.horaActual.equals(HORA_FINAL); this.horaActual.increment()) {
             // digo que empezo el minuto
-            System.out.printf("[PlanificadorConsultas] Hora: %02d:%02d\n", this.horaActual.hora, this.horaActual.min);
+            System.out.printf(
+                    "[PlanificadorConsultas] Empezó el minuto: %02d:%02d\n",
+                    this.horaActual.hora,
+                    this.horaActual.min);
             this.empezoElMinuto.release(totalHilos);
 
             // espero a que todos terminen
             this.terminoElMinuto.acquire(totalHilos);
-            System.out.printf("[PlanificadorConsultas] Terminó el minuto %02d:%02d\n", this.horaActual.hora,
+            System.out.printf(
+                    "[PlanificadorConsultas] Terminó el minuto %02d:%02d\n",
+                    this.horaActual.hora,
                     this.horaActual.min);
             int n = this.terminaronTodos.getNumberWaiting();
             if (n != 0) {

@@ -1,6 +1,7 @@
 package ucu.utils;
 
 public class Hora {
+    public final static int MAX_MIN = 60;
 
     public int hora;
     public int min;
@@ -12,7 +13,7 @@ public class Hora {
 
     public void increment() {
         this.min += 1;
-        if (this.min == 60) {
+        if (this.min == MAX_MIN) {
             this.hora += 1;
             this.min = 0;
         }
