@@ -1,10 +1,11 @@
 package ucu.slay;
 
+import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.locks.ReentrantLock;
 
 import ucu.utils.Hora;
 
@@ -13,20 +14,21 @@ public class PlanificadorConsultas {
     private static final Hora HORA_INICIAL = new Hora(8, 0);
     private static final Hora HORA_FINAL = new Hora(20, 0);
 
-    public final Configuracion config;
+    private final Configuracion config;
 
+    private final ReentrantLock mutexColas;
     // Las emergencias no tienen prioridad. Las atendemos y listo.
-    private final ArrayBlockingQueue<Paciente> consultasEmergencia;
+    private final ArrayDeque<Paciente> consultasEmergencia;
 
     // Las urgencias tampoco tienen proridad entre sí.
-    private final ArrayBlockingQueue<Paciente> consultasUrgenciaAlta;
-    private final ArrayBlockingQueue<Paciente> consultasUrgenciaBaja;
+    private final ArrayDeque<Paciente> consultasUrgenciaAlta;
+    private final ArrayDeque<Paciente> consultasUrgenciaBaja;
 
     // Entre las consultas normales, tampoco hay prioridad.
     //
     // Las urgencias tendrían más prioridad, en teoría, pero sin embargo una vez que
     // envejecen demasiado pasan a `consultasUrgencia`.
-    private final ArrayBlockingQueue<Paciente> consultasNormales;
+    private final ArrayDeque<Paciente> consultasNormales;
 
     public final Semaphore empezoElMinuto;
     public final Semaphore terminoElMinuto;
@@ -36,14 +38,14 @@ public class PlanificadorConsultas {
     public PlanificadorConsultas(Configuracion config) {
         this.config = config;
 
-        int cap = config.pacientesPorHora * 2;
-        this.consultasEmergencia = new ArrayBlockingQueue<>(cap, true);
-        this.consultasUrgenciaAlta = new ArrayBlockingQueue<>(cap, true);
-        this.consultasUrgenciaBaja = new ArrayBlockingQueue<>(cap, true);
-        this.consultasNormales = new ArrayBlockingQueue<>(cap, true);
+        this.consultasEmergencia = new ArrayDeque<>();
+        this.consultasUrgenciaAlta = new ArrayDeque<>();
+        this.consultasUrgenciaBaja = new ArrayDeque<>();
+        this.consultasNormales = new ArrayDeque<>();
+        this.mutexColas = new ReentrantLock();
 
-        this.empezoElMinuto = new Semaphore(0, true);
-        this.terminoElMinuto = new Semaphore(0, true);
+        this.empezoElMinuto = new Semaphore(0);
+        this.terminoElMinuto = new Semaphore(0);
     }
 
     class InitResult {
@@ -70,7 +72,12 @@ public class PlanificadorConsultas {
 
         int totalHilos = 0;
 
-        Thread hiloGenerador = new Thread(new GeneradorPacientes(config.semilla, this));
+        Thread hiloGenerador = new Thread(
+                new GeneradorPacientes(
+                        config.semilla,
+                        config.cantInicialPacientes,
+                        config.pacientesPorHora,
+                        this));
         hiloGenerador.start();
         totalHilos += 1;
 
@@ -103,9 +110,10 @@ public class PlanificadorConsultas {
         var totalHilos = result.totalHilos;
         var generadorPacientes = result.generadorPacientes;
         var medicos = result.medicos;
-        var enfermeros = result.medicos;
+        var enfermeros = result.enfermeros;
 
         System.out.printf("[PlanificadorConsultas] Empezando la simulación con %d hilos\n", totalHilos);
+        // TODO: Si estoy atendiendo gente sigo
         for (this.horaActual = HORA_INICIAL; !this.horaActual.equals(HORA_FINAL); this.horaActual.increment()) {
             // digo que empezo el minuto
             System.out.printf("[PlanificadorConsultas] Hora: %02d:%02d\n", this.horaActual.hora, this.horaActual.min);
@@ -146,10 +154,30 @@ public class PlanificadorConsultas {
         if (p.consultaDeseada.esEmergencia()) {
             this.consultasEmergencia.add(p);
         } else if (p.consultaDeseada.esUrgencia()) {
+            // TODO: Es alta o baja?
             this.consultasUrgenciaBaja.add(p);
         } else {
             this.consultasNormales.add(p);
         }
+    }
+
+    public void recibirPacienteDeSala(Paciente p) {
+        if (p.consultaDeseada.esEmergencia()) {
+            this.consultasEmergencia.addLast(p);
+        } else if (p.consultaDeseada.esUrgencia()) {
+            // TODO: Es alta o baja?
+            this.consultasUrgenciaBaja.addLast(p);
+        } else {
+            this.consultasNormales.addLast(p);
+        }
+    }
+
+    public void trancarColas() {
+        this.mutexColas.lock();
+    }
+
+    public void destrancarColas() {
+        this.mutexColas.unlock();
     }
 
     public Optional<Paciente> conseguirPacienteInterruptor() {
@@ -166,6 +194,15 @@ public class PlanificadorConsultas {
         Paciente pUrgenciaBaja = this.consultasUrgenciaBaja.poll();
         if (pUrgenciaBaja != null) {
             return Optional.of(pUrgenciaBaja);
+        }
+
+        return Optional.empty();
+    }
+
+    public Optional<Paciente> conseguirPacienteNormal() {
+        Paciente p = this.consultasEmergencia.poll();
+        if (p != null) {
+            return Optional.of(p);
         }
 
         return Optional.empty();

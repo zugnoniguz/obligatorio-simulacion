@@ -1,10 +1,7 @@
 package ucu.slay;
 
-import java.util.ArrayList;
 import java.util.Optional;
-import java.util.concurrent.ArrayBlockingQueue;
 import java.util.concurrent.BrokenBarrierException;
-import java.util.concurrent.Semaphore;
 
 public class Medico implements Runnable {
 
@@ -64,11 +61,13 @@ public class Medico implements Runnable {
                 }
             }
 
-            if (this.pacienteActual != null) {
-                // loEstoyAtendiendo(pacienteActual);
-                // tengo que esperar a un enfermero (probablemente un semaforo o algo (estaria
-                // bueno que el medico sepa quien es el enfermero))
+            if (this.pacienteActual == null) {
+                // sigo sin tener, no tengo que hacer nada
+                return;
             }
+
+            // tengo que esperar a un enfermero y a una sala (probablemente un semaforo o
+            // algo (estaria bueno que el medico sepa quien es el enfermero))
             return;
         }
 
@@ -80,8 +79,8 @@ public class Medico implements Runnable {
 
             Optional<Paciente> p = this.planificador.conseguirPacienteInterruptor();
             if (p.isPresent()) {
-                // devuelvoPacienteASalaDeEspera(pacienteActual);
-                // loEstoyAtendiendo(pacienteActual);
+                this.planificador.recibirPacienteDeSala(this.pacienteActual);
+                this.pacienteActual = p.orElseThrow();
 
                 // no necesito esperar a un enfermero porque ya tengo uno al estar atendiendo ya
                 // un paciente

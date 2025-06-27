@@ -9,21 +9,29 @@ public class GeneradorPacientes implements Runnable {
 
     private final int semilla;
     private final Random random;
+    private final int cantInicialPacientes;
+    private final int pacientesPorHora;
     private PlanificadorConsultas planificador;
 
-    public GeneradorPacientes(int semilla, PlanificadorConsultas planificador) {
+    public GeneradorPacientes(
+            int semilla,
+            int cantInicialPacientes,
+            int pacientesPorHora,
+            PlanificadorConsultas planificador) {
         this.planificador = planificador;
 
         this.semilla = semilla;
         this.random = new Random(this.semilla);
+        this.pacientesPorHora = pacientesPorHora;
+        this.cantInicialPacientes = cantInicialPacientes;
 
-        for (int i = 0; i < this.planificador.config.cantInicialPacientes; ++i) {
+        for (int i = 0; i < this.cantInicialPacientes; ++i) {
             this.generarPaciente();
         }
     }
 
     public void runPosta() throws BrokenBarrierException, InterruptedException {
-        int[] mins = new int[this.planificador.config.pacientesPorHora];
+        int[] mins = new int[this.pacientesPorHora];
         while (true) {
             this.planificador.empezoElMinuto.acquire();
 
