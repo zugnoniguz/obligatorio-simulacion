@@ -51,23 +51,35 @@ public class Medico implements Runnable {
 
     private void conseguirPacienteNuevoSiCorresponde() throws InterruptedException {
         if (this.pacienteActual == null) {
-            Optional<Paciente> p = this.planificador.conseguirPacienteInterruptor();
-            if (p.isPresent()) {
-                this.pacienteActual = p.orElseThrow();
-            } else {
-                p = this.planificador.conseguirPacienteNormal();
+            this.planificador.trancarColas();
+            try {
+                Optional<Paciente> p = this.planificador.conseguirPaciente();
                 if (p.isPresent()) {
                     this.pacienteActual = p.orElseThrow();
                 }
-            }
 
-            if (this.pacienteActual == null) {
-                // sigo sin tener, no tengo que hacer nada
-                return;
-            }
+                if (this.pacienteActual == null) {
+                    // no hay nadie para atender, no hago nada.
+                    return;
+                }
 
-            // tengo que esperar a un enfermero y a una sala (probablemente un semaforo o
-            // algo (estaria bueno que el medico sepa quien es el enfermero))
+                // tengo que esperar a un enfermero y a una sala.
+                this.planificador.trancarEnfermeros();
+                try {
+                    if (this.planificador.enfermerosDisponibles.isEmpty()) {
+                        // no hay nadie que me ayude, marco que necesito ayuda y sigo.
+                        this.planificador.medicosEsperando += 1;
+                        return;
+                    }
+
+                    Integer idEnfermero = this.planificador.enfermerosDisponibles.removeLast();
+                    this.planificador.enfermerosOcupados.put(this.id, idEnfermero);
+                } finally {
+                    this.planificador.destrancarEnfermeros();
+                }
+            } finally {
+                this.planificador.destrancarColas();
+            }
             return;
         }
 
@@ -82,8 +94,8 @@ public class Medico implements Runnable {
                 this.planificador.recibirPacienteDeSala(this.pacienteActual);
                 this.pacienteActual = p.orElseThrow();
 
-                // no necesito esperar a un enfermero porque ya tengo uno al estar atendiendo ya
-                // un paciente
+                // no necesito esperar a un enfermero ni sala porque ya tengo uno al estar
+                // atendiendo ya un paciente
             }
 
             // Si no hay nada que me interrumpa, directamente sigo

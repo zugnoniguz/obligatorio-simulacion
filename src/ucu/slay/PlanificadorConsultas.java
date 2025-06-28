@@ -2,6 +2,7 @@ package ucu.slay;
 
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Optional;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Semaphore;
@@ -16,24 +17,25 @@ public class PlanificadorConsultas {
 
     private final Configuracion config;
 
+    // La tranca para acceder a todas las colas
     private final ReentrantLock mutexColas;
+    private final ReentrantLock mutexEnfermeros;
     // Las emergencias no tienen prioridad. Las atendemos y listo.
     private final ArrayDeque<Paciente> consultasEmergencia;
-
-    // Las urgencias tampoco tienen proridad entre sí.
+    // Las urgencias tienen proridad entre sí, según cuanto tiempo van sin ser
+    // atendidas.
     private final ArrayDeque<Paciente> consultasUrgenciaAlta;
     private final ArrayDeque<Paciente> consultasUrgenciaBaja;
-
     // Entre las consultas normales, tampoco hay prioridad.
-    //
-    // Las urgencias tendrían más prioridad, en teoría, pero sin embargo una vez que
-    // envejecen demasiado pasan a `consultasUrgencia`.
     private final ArrayDeque<Paciente> consultasNormales;
 
     public final Semaphore empezoElMinuto;
     public final Semaphore terminoElMinuto;
+    public int medicosEsperando;
     public CyclicBarrier terminaronTodos;
     public Hora horaActual;
+    public ArrayList<Integer> enfermerosDisponibles;
+    public HashMap<Integer, Integer> enfermerosOcupados;
 
     public PlanificadorConsultas(Configuracion config) {
         this.config = config;
@@ -43,6 +45,8 @@ public class PlanificadorConsultas {
         this.consultasUrgenciaBaja = new ArrayDeque<>();
         this.consultasNormales = new ArrayDeque<>();
         this.mutexColas = new ReentrantLock();
+        this.mutexEnfermeros = new ReentrantLock();
+        this.medicosEsperando = 0;
 
         this.empezoElMinuto = new Semaphore(0);
         this.terminoElMinuto = new Semaphore(0);
@@ -183,6 +187,28 @@ public class PlanificadorConsultas {
 
     public void destrancarColas() {
         this.mutexColas.unlock();
+    }
+
+    public void trancarEnfermeros() {
+        this.mutexEnfermeros.lock();
+    }
+
+    public void destrancarEnfermeros() {
+        this.mutexEnfermeros.unlock();
+    }
+
+    public Optional<Paciente> conseguirPaciente() {
+        Optional<Paciente> pInterruptor = this.conseguirPacienteInterruptor();
+        if (pInterruptor.isPresent()) {
+            return pInterruptor;
+        }
+
+        Optional<Paciente> pNormal = this.conseguirPacienteNormal();
+        if (pNormal.isPresent()) {
+            return pNormal;
+        }
+
+        return Optional.empty();
     }
 
     public Optional<Paciente> conseguirPacienteInterruptor() {
