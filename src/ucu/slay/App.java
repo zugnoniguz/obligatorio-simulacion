@@ -7,13 +7,7 @@ import java.util.logging.FileHandler;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-import javax.naming.OperationNotSupportedException;
-
 public class App {
-
-    private static Configuracion readFromStdin() throws OperationNotSupportedException {
-        throw new OperationNotSupportedException("No sé leer de la consola");
-    }
 
     public static void main(String[] args) throws Exception {
         FileHandler fh = new FileHandler("simulacion.log", false);
@@ -31,13 +25,17 @@ public class App {
         // l.addHandler(ch);
         l.setLevel(Level.FINEST);
 
-        Configuracion config;
-        if (args.length == 0) {
-            // No me pasaron nada
-            config = readFromStdin();
-        } else {
-            assert args[0].equals("-f");
-            config = Configuracion.readFromFile(args[1]);
+        Configuracion config = null;
+        switch (args.length) {
+            case 0 -> {
+                System.err.printf("Faltó el archivo como argumento\n");
+            }
+            case 1 -> {
+                config = Configuracion.readFromFile(args[0]);
+            }
+            default -> {
+                System.err.printf("Demasiados argumentos no sé qué hacer\n");
+            }
         }
 
         if (config == null) {
