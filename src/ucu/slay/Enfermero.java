@@ -18,10 +18,25 @@ public class Enfermero implements Runnable {
             this.planificador.empezoElMinuto.acquire();
             System.out.printf("[Enfermero %d] Empezando el minuto\n", this.id);
 
+            this.atenderPaciente();
+
             // y aviso que termine
             System.out.printf("[Enfermero %d] Terminando el minuto\n", this.id);
             this.planificador.terminaronTodos.await();
             this.planificador.terminoElMinuto.release();
+        }
+    }
+
+    private void atenderPaciente() {
+
+        this.planificador.trancarEnfermeros();
+        try {
+            if (this.planificador.enfermeroOcupado(this.id)) {
+                // Si estoy ocupado con un médico, no puedo hacer nada.
+                return;
+            }
+        } finally {
+            this.planificador.destrancarEnfermeros();
         }
     }
 

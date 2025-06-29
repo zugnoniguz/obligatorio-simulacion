@@ -20,6 +20,7 @@ public class PlanificadorConsultas {
     // La tranca para acceder a todas las colas
     private final ReentrantLock mutexColas;
     private final ReentrantLock mutexEnfermeros;
+    private final ReentrantLock mutexSalas;
     // Las emergencias no tienen prioridad. Las atendemos y listo.
     private final ArrayDeque<Paciente> consultasEmergencia;
     // Las urgencias tienen proridad entre sí, según cuanto tiempo van sin ser
@@ -36,6 +37,8 @@ public class PlanificadorConsultas {
     public Hora horaActual;
     public ArrayList<Integer> enfermerosDisponibles;
     public HashMap<Integer, Integer> enfermerosOcupados;
+    public ArrayList<Integer> salasDisponibles;
+    public HashMap<Integer, Integer> salasOcupadas;
 
     public PlanificadorConsultas(Configuracion config) {
         this.config = config;
@@ -44,9 +47,16 @@ public class PlanificadorConsultas {
         this.consultasUrgenciaAlta = new ArrayDeque<>();
         this.consultasUrgenciaBaja = new ArrayDeque<>();
         this.consultasNormales = new ArrayDeque<>();
+
         this.mutexColas = new ReentrantLock();
         this.mutexEnfermeros = new ReentrantLock();
+        this.mutexSalas = new ReentrantLock();
+
         this.medicosEsperando = 0;
+        this.enfermerosDisponibles = new ArrayList<>();
+        this.enfermerosOcupados = new HashMap<>();
+        this.salasDisponibles = new ArrayList<>();
+        this.salasOcupadas = new HashMap<>();
 
         this.empezoElMinuto = new Semaphore(0);
         this.terminoElMinuto = new Semaphore(0);
@@ -93,13 +103,19 @@ public class PlanificadorConsultas {
         }
 
         for (int i = 0; i < config.cantEnfermeros; ++i) {
-            Thread t = new Thread(new Enfermero(i + 1, this));
+            int id = i + 1;
+            Thread t = new Thread(new Enfermero(id, this));
             t.start();
             enfermeros.add(t);
+            enfermerosDisponibles.add(id);
             totalHilos += config.cantEnfermeros;
         }
 
         this.terminaronTodos = new CyclicBarrier(totalHilos);
+        // TODO: Salas disponibles
+        for (int i = 0; i < 5; ++i) {
+            this.salasDisponibles.add(i + 1);
+        }
 
         return new InitResult(
                 totalHilos,
@@ -181,6 +197,16 @@ public class PlanificadorConsultas {
         }
     }
 
+    public boolean enfermeroOcupado(Integer idEnfermero) {
+        for (int i : this.enfermerosOcupados.values()) {
+            if (idEnfermero.equals(i)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
     public void trancarColas() {
         this.mutexColas.lock();
     }
@@ -195,6 +221,14 @@ public class PlanificadorConsultas {
 
     public void destrancarEnfermeros() {
         this.mutexEnfermeros.unlock();
+    }
+
+    public void trancarSalas() {
+        this.mutexSalas.lock();
+    }
+
+    public void destrancarSalas() {
+        this.mutexSalas.unlock();
     }
 
     public Optional<Paciente> conseguirPaciente() {
