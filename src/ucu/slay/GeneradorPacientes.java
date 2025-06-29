@@ -32,16 +32,20 @@ public class GeneradorPacientes implements Runnable {
         this.pacientesPorHora = pacientesPorHora;
         this.cantInicialPacientes = cantInicialPacientes;
         this.currentId = 1;
-
-        for (int i = 0; i < this.cantInicialPacientes; ++i) {
-            this.generarPaciente();
-        }
     }
 
     public void runPosta() throws BrokenBarrierException, InterruptedException {
         int[] mins = new int[this.pacientesPorHora];
+        boolean firstRun = true;
         while (true) {
             this.planificador.empezoElMinuto.acquire();
+
+            if (firstRun) {
+                firstRun = false;
+                for (int i = 0; i < this.cantInicialPacientes; ++i) {
+                    this.generarPaciente();
+                }
+            }
 
             if (this.planificador.horaActual.min == 0) {
                 for (int i = 0; i < mins.length; ++i) {
@@ -66,7 +70,7 @@ public class GeneradorPacientes implements Runnable {
         int id = this.currentId++;
         int tiempoRestante = consulta.getTiempoEstimado();
         tiempoRestante *= 1 + this.random.nextDouble(-MAX_TIME_VARIANCE, MAX_TIME_VARIANCE);
-        Paciente p = new Paciente(id, consulta, this.planificador.horaActual, tiempoRestante);
+        Paciente p = new Paciente(id, consulta, this.planificador.horaActual.clone(), tiempoRestante);
 
         char nivel = '%';
         if (p.consultaDeseada.esEmergencia()) {

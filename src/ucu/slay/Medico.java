@@ -1,5 +1,7 @@
 package ucu.slay;
 
+import ucu.utils.Hora;
+
 import java.util.Optional;
 import java.util.concurrent.BrokenBarrierException;
 import java.util.logging.Level;
@@ -219,6 +221,17 @@ public class Medico implements Runnable {
 
     private void atenderPaciente() throws InterruptedException {
         this.pacienteActual.tiempoRestante -= 1;
+        this.pacienteActual.tiempoDeAtencion += 1;
+        this.planificador.statsLock.lock();
+        Hora hora = this.planificador.horaActual.clone();
+        var atendidos = this.planificador.stats.pacientesAtendidos;
+        if (atendidos.containsKey(hora)) {
+            int curr = atendidos.get(hora);
+            atendidos.put(hora, curr + 1);
+        } else {
+            atendidos.put(hora, 1);
+        }
+        this.planificador.statsLock.unlock();
         LOGGER.log(
                 Level.FINER,
                 "[{0}] Atendiendo a paciente {1} con enfermero {2} en sala {3}, quedan {4}mins",
@@ -242,12 +255,6 @@ public class Medico implements Runnable {
                     });
 
             this.planificador.statsLock.lock();
-            if (this.planificador.stats.pacientesAtendidos.containsKey(this.planificador.horaActual)) {
-                int curr = this.planificador.stats.pacientesAtendidos.get(this.planificador.horaActual);
-                this.planificador.stats.pacientesAtendidos.put(this.planificador.horaActual, curr + 1);
-            } else {
-                this.planificador.stats.pacientesAtendidos.put(this.planificador.horaActual, 1);
-            }
             this.planificador.stats.pacientesTerminados.add(this.pacienteActual);
             this.planificador.statsLock.unlock();
 

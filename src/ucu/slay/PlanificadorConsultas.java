@@ -15,8 +15,8 @@ import ucu.utils.Hora;
 public class PlanificadorConsultas {
     private static final Logger LOGGER = Logger.getLogger(PlanificadorConsultas.class.getName());
 
-    private static final Hora HORA_INICIAL = new Hora(8, 0);
-    private static final Hora HORA_FINAL = new Hora(20, 0);
+    public static final Hora HORA_INICIAL = new Hora(8, 0);
+    public static final Hora HORA_FINAL = new Hora(20, 0);
 
     private final Configuracion config;
 
@@ -145,25 +145,21 @@ public class PlanificadorConsultas {
 
         LOGGER.log(Level.FINER, "Empezando la simulación con {0} hilos", totalHilos);
         // TODO: Si estoy atendiendo gente sigo
-        for (this.horaActual = HORA_INICIAL; !this.horaActual.equals(HORA_FINAL); this.horaActual.increment()) {
+        for (this.horaActual = HORA_INICIAL.clone(); !this.horaActual.equals(HORA_FINAL); this.horaActual.increment()) {
             LOGGER.log(Level.FINEST, "");
             // digo que empezo el minuto
             LOGGER.log(Level.FINER,
-                    "Empezó el minuto: {0}:{1}",
-                    new Object[] {
-                            String.format("%02d", this.horaActual.hora),
-                            String.format("%02d", this.horaActual.min)
-                    });
+                    "Empezó el minuto: {0}",
+                    this.horaActual.toString());
             this.empezoElMinuto.release(totalHilos);
 
             // espero a que todos terminen
             this.terminoElMinuto.acquire(totalHilos);
             int total = this.totalEsperando();
             LOGGER.log(Level.FINER,
-                    "Terminó el minuto: {0}:{1} con {2} en espera",
+                    "Terminó el minuto: {0} con {1} en espera",
                     new Object[] {
-                            String.format("%02d", this.horaActual.hora),
-                            String.format("%02d", this.horaActual.min),
+                            this.horaActual.toString(),
                             total,
                     });
             LOGGER.log(Level.FINER,
@@ -347,7 +343,7 @@ public class PlanificadorConsultas {
     private void actualizarStats() {
         this.statsLock.lock();
         try {
-            this.stats.pacientesEsperando.put(this.horaActual,
+            this.stats.pacientesEsperando.put(this.horaActual.clone(),
                     new Integer[] {
                             this.consultasEmergencia.size(),
                             this.consultasUrgenciaAlta.size(),

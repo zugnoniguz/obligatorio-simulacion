@@ -5,7 +5,7 @@ cantEnfermeros = 2
 
 cantInicialPacientes = 2
 
-pacientesPorHora = 3
+pacientesPorHora = 6
 
 consulta = dermatología
 consulta = pediatría
