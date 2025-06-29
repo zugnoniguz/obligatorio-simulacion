@@ -135,7 +135,7 @@ public class PlanificadorConsultas {
                 hiloGenerador);
     }
 
-    public void correrSimulacion() throws InterruptedException {
+    public Hora correrSimulacion() throws InterruptedException {
         var result = this.initSimulacion();
 
         var totalHilos = result.totalHilos;
@@ -144,8 +144,8 @@ public class PlanificadorConsultas {
         var enfermeros = result.enfermeros;
 
         LOGGER.log(Level.FINER, "Empezando la simulación con {0} hilos", totalHilos);
-        // TODO: Si estoy atendiendo gente sigo
-        for (this.horaActual = HORA_INICIAL.clone(); !this.horaActual.equals(HORA_FINAL); this.horaActual.increment()) {
+        this.horaActual = HORA_INICIAL.clone();
+        while (true) {
             LOGGER.log(Level.FINEST, "");
             // digo que empezo el minuto
             LOGGER.log(Level.FINER,
@@ -185,7 +185,26 @@ public class PlanificadorConsultas {
 
             this.actualizarStats();
 
-            // avanzo el minuto (el for)
+            // avanzo el minuto
+            if (this.horaActual.compareTo(PlanificadorConsultas.HORA_FINAL) >= 0) {
+                int siendoAtendidos = this.stats.pacientesAtendidos.getOrDefault(this.horaActual, 0);
+                int esperando = this.totalEsperando();
+                if (siendoAtendidos != 0) {
+                    LOGGER.log(Level.FINER,
+                            "Siguiendo porque quedan {0} pacientes siendo atendidos",
+                            siendoAtendidos);
+                } else {
+                    if (esperando != 0) {
+                        LOGGER.log(Level.FINER,
+                                "Siguiendo porque quedan {0} pacientes en espera",
+                                esperando);
+
+                    } else {
+                        break;
+                    }
+                }
+            }
+            this.horaActual.increment();
         }
 
         generadorPacientes.interrupt();
@@ -199,6 +218,8 @@ public class PlanificadorConsultas {
             t.interrupt();
             t.join();
         }
+
+        return this.horaActual.clone();
     }
 
     public int totalEsperando() {
@@ -215,6 +236,11 @@ public class PlanificadorConsultas {
     // pacientes no pueden entrar en la sala
     // de espera
     public void recibirPaciente(Paciente p) {
+        if (this.horaActual.compareTo(PlanificadorConsultas.HORA_FINAL) >= 0) {
+            LOGGER.log(Level.FINER, "Ignorando paciente porque cerró el hospital");
+            return;
+        }
+
         if (p.consultaDeseada.esEmergencia()) {
             this.consultasEmergencia.add(p);
         } else if (p.consultaDeseada.esUrgencia()) {
@@ -310,11 +336,6 @@ public class PlanificadorConsultas {
         }
 
         return Optional.empty();
-    }
-
-    public boolean hayPacienteNormal() {
-        Paciente p = this.consultasNormales.poll();
-        return p != null;
     }
 
     public void aumentarPrioridadUrgencia(Paciente p) {

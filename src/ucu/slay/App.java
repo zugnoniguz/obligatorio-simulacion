@@ -54,7 +54,7 @@ public class App {
         }
 
         PlanificadorConsultas planificador = new PlanificadorConsultas(config);
-        planificador.correrSimulacion();
+        Hora horaFinal = planificador.correrSimulacion();
 
         Stats stats = planificador.stats;
         {
@@ -63,14 +63,18 @@ public class App {
             try {
                 writer.write("Hora,Espera emergencia,Espera urgencia,Espera normal,Siendo atendidos\n");
                 for (Hora hora = PlanificadorConsultas.HORA_INICIAL.clone(); !hora
-                        .equals(PlanificadorConsultas.HORA_FINAL); hora.increment()) {
+                        .equals(horaFinal); hora.increment()) {
                     Integer[] espera = stats.pacientesEsperando.get(hora);
                     int atendidos = stats.pacientesAtendidos.getOrDefault(hora, 0);
-                    String s = String.format("%s,%d,%d,%d,%d", hora.toString(), espera[0], espera[1] + espera[2],
+                    String s = String.format("%s,%d,%d,%d,%d",
+                            hora.toString(),
+                            espera[0],
+                            espera[1] + espera[2],
                             espera[3],
                             atendidos);
                     writer.write(String.format("%s\n", s));
                 }
+                writer.write(String.format("%s,0,0,0,0\n", horaFinal));
             } finally {
                 writer.close();
             }
@@ -90,13 +94,13 @@ public class App {
                     }
                 });
                 for (Paciente p : newList) {
-                    Hora horaFinal = p.horaLlegada.clone();
+                    Hora horaSalida = p.horaLlegada.clone();
                     for (int i = 0; i < p.tiempoDesdeLlegada; ++i) {
-                        horaFinal.increment();
+                        horaSalida.increment();
                     }
                     String s = String.format("%s,%s,%d,%d,%d,%d",
                             p.horaLlegada,
-                            horaFinal,
+                            horaSalida,
                             p.consultaDeseada.getTiempoEstimado(),
                             p.tiempoDeAtencion,
                             p.tiempoDesdeLlegada - p.tiempoDeAtencion,
