@@ -80,7 +80,10 @@ public class GeneradorPacientes implements Runnable {
             nivel = 'N';
         }
 
-        LOGGER.log(Level.FINER, "Generado paciente [{0}] ({1}) {2}min", new Object[] { p.id, nivel, p.tiempoRestante });
+        LOGGER.log(
+                Level.FINER,
+                "Generando paciente [{0}] ({1}) {2}min",
+                new Object[] { p.id, nivel, p.tiempoRestante });
         this.planificador.trancarColas();
         this.planificador.recibirPaciente(p);
         this.planificador.destrancarColas();

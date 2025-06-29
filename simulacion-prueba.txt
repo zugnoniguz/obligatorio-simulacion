@@ -1,11 +1,11 @@
 semilla = 69420
 
-cantMedicos = 1
-cantEnfermeros = 1
+cantMedicos = 2
+cantEnfermeros = 2
 
-cantInicialPacientes = 6
+cantInicialPacientes = 2
 
-pacientesPorHora = 8
+pacientesPorHora = 3
 
 consulta = dermatología
 consulta = pediatría

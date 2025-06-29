@@ -102,7 +102,7 @@ public class PlanificadorConsultas {
             Thread t = new Thread(new Medico(i + 1, this));
             t.start();
             medicos.add(t);
-            totalHilos += config.cantMedicos;
+            totalHilos += 1;
         }
 
         for (int i = 0; i < config.cantEnfermeros; ++i) {
@@ -111,7 +111,7 @@ public class PlanificadorConsultas {
             t.start();
             enfermeros.add(t);
             enfermerosDisponibles.add(id);
-            totalHilos += config.cantEnfermeros;
+            totalHilos += 1;
         }
 
         this.terminaronTodos = new CyclicBarrier(totalHilos);
@@ -295,7 +295,7 @@ public class PlanificadorConsultas {
             return Optional.of(pUrgenciaBaja);
         }
 
-        Paciente p = this.consultasEmergencia.poll();
+        Paciente p = this.consultasNormales.poll();
         if (p != null) {
             return Optional.of(p);
         }
