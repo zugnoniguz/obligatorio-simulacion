@@ -30,19 +30,31 @@ public class Medico implements Runnable {
             LOGGER.log(Level.FINER, "[{0}] Empezando el minuto", this.id);
 
             // me fijo que notificaciones hay (y hago lo que corresponda si pasa)
+            // Si no tengo paciente, busco obtener uno
             if (this.pacienteActual == null) {
                 this.conseguirPacienteNuevo();
-            } else {
-                this.verificarEmergencia();
             }
 
-            if (this.pacienteActual != null && this.enfermeroId == null) {
-                this.conseguirEnfermeroSiHay();
+            if (this.pacienteActual != null) {
+                // Si tengo paciente pero no enfermero, busco enfermero
+                if (this.enfermeroId == null) {
+                    this.conseguirEnfermeroSiHay();
+                }
+
+                // Si conseguí enfermero, me fijo si tengo que atender a alguien uevo
+                if (this.enfermeroId != null) {
+                    this.verificarEmergencia();
+                }
+
             }
 
             // hago lo que tengo que hacer
-            if (this.puedoAtender()) {
-                this.atenderPaciente();
+            if (this.pacienteActual != null) {
+                this.pacienteActual.tiempoDesdeLlegada += 1;
+
+                if (this.puedoAtender()) {
+                    this.atenderPaciente();
+                }
             }
 
             // y aviso que termine
@@ -125,13 +137,13 @@ public class Medico implements Runnable {
     }
 
     private void verificarEmergencia() throws InterruptedException {
-        LOGGER.log(Level.FINER, "[{0}] Ya tengo paciente, me voy a fijar si hay emergencias", this.id);
         // Si ya tengo un paciente, pero no es emergencia, puedo interrumpirlo y poner
         // una emergencia
         if (!this.pacienteActual.consultaDeseada.esEmergencia()) {
+            LOGGER.log(Level.FINER, "[{0}] Tengo paciente no emergencia, me voy a fijar si hay emergencias", this.id);
+
             // Solo me importa si hay pacientes nuevos si ya no estoy atendiendo una
             // emergencia
-
             Optional<Paciente> p = this.planificador.conseguirPacienteInterruptor();
             if (p.isPresent()) {
                 this.planificador.recibirPacienteDeSala(this.pacienteActual);
@@ -217,6 +229,7 @@ public class Medico implements Runnable {
                         this.salaId,
                         this.pacienteActual.tiempoRestante
                 });
+
         if (pacienteActual.tiempoRestante == 0) {
             LOGGER.log(
                     Level.FINER,
