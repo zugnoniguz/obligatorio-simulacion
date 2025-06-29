@@ -6,21 +6,22 @@ import ucu.utils.FileUtils;
 
 // El programa debe recibir por pantalla los datos necesarios para la simulación.
 public class Configuracion {
-    public int semilla;
+    public final int semilla;
 
     // Número inicial de pacientes a la hora 8:00.
-    public int cantInicialPacientes;
+    public final int cantInicialPacientes;
 
     // Cantidad de pacientes que llegan por hora y motivo por el que vienen.
     // Cantidad de tiempo que demora en atender al paciente por especialidad.
-    public int pacientesPorHora;
-    public TipoConsulta[] tiposConsulta;
+    public final int pacientesPorHora;
+    public final TipoConsulta[] tiposConsulta;
 
     // Indicador si existe sala reservada por emergencia.
-    public boolean existeSalaReservada;
+    public final boolean existeSalaReservada;
 
-    public int cantMedicos;
-    public int cantEnfermeros;
+    public final int cantMedicos;
+    public final int cantEnfermeros;
+    public final int cantSalas;
 
     public Configuracion(
             int semilla,
@@ -29,7 +30,8 @@ public class Configuracion {
             TipoConsulta[] tiposConsulta,
             boolean existeSalaReservada,
             int cantMedicos,
-            int cantEnfermeros) {
+            int cantEnfermeros,
+            int cantSalas) {
         this.semilla = semilla;
         this.cantInicialPacientes = cantInicialPacientes;
         this.pacientesPorHora = pacientesPorHora;
@@ -37,6 +39,7 @@ public class Configuracion {
         this.existeSalaReservada = existeSalaReservada;
         this.cantMedicos = cantMedicos;
         this.cantEnfermeros = cantEnfermeros;
+        this.cantSalas = cantSalas;
     }
 
     public static Configuracion readFromFile(String fpath) {
@@ -49,6 +52,7 @@ public class Configuracion {
         Boolean existeSalaReservada = null;
         Integer cantMedicos = null;
         Integer cantEnfermeros = null;
+        Integer cantSalas = null;
         for (String line : lines) {
             line = line.trim();
             if (line.isEmpty()) {
@@ -113,6 +117,13 @@ public class Configuracion {
                     }
                     cantEnfermeros = Integer.valueOf(rest.trim());
                 }
+                case "cantSalas" -> {
+                    if (cantSalas != null) {
+                        System.err.printf("Valor duplicado de cantSalas, ignorando\n");
+                        continue;
+                    }
+                    cantSalas = Integer.valueOf(rest.trim());
+                }
                 default -> {
                     System.err.printf("Ignorando clave inválida %s\n", name);
                 }
@@ -154,6 +165,11 @@ public class Configuracion {
             return null;
         }
 
+        if (cantSalas == null) {
+            System.err.println("Falto cantSalas");
+            return null;
+        }
+
         return new Configuracion(
                 semilla,
                 cantInicialPacientes,
@@ -161,6 +177,7 @@ public class Configuracion {
                 consultas.toArray(TipoConsulta[]::new),
                 existeSalaReservada,
                 cantMedicos,
-                cantEnfermeros);
+                cantEnfermeros,
+                cantSalas);
     }
 }

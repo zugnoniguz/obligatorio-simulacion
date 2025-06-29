@@ -123,8 +123,7 @@ public class PlanificadorConsultas {
         }
 
         this.terminaronTodos = new CyclicBarrier(totalHilos);
-        // TODO: Salas disponibles
-        for (int i = 0; i < 5; ++i) {
+        for (int i = 0; i < config.cantSalas; ++i) {
             this.salasDisponibles.add(i + 1);
         }
 

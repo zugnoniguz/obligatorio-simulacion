@@ -2,6 +2,7 @@ semilla = 69420
 
 cantMedicos = 2
 cantEnfermeros = 2
+cantSalas = 2;
 
 cantInicialPacientes = 2
 
