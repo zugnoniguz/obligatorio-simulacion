@@ -1,8 +1,11 @@
 package ucu.slay;
 
 import java.util.concurrent.BrokenBarrierException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Enfermero implements Runnable {
+    private static final Logger LOGGER = Logger.getLogger(Enfermero.class.getName());
 
     private final int id;
     private final PlanificadorConsultas planificador;
@@ -16,12 +19,12 @@ public class Enfermero implements Runnable {
         while (true) {
             // esperar a que avance el minuto
             this.planificador.empezoElMinuto.acquire();
-            System.out.printf("[Enfermero %d] Empezando el minuto\n", this.id);
+            LOGGER.log(Level.FINER, "[{0}] Empezando el minuto", this.id);
 
             this.atenderPaciente();
 
             // y aviso que termine
-            System.out.printf("[Enfermero %d] Terminando el minuto\n", this.id);
+            LOGGER.log(Level.FINER, "[{0}] Terminando el minuto", this.id);
             this.planificador.terminaronTodos.await();
             this.planificador.terminoElMinuto.release();
         }

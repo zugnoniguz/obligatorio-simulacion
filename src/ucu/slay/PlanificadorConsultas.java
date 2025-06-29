@@ -7,10 +7,13 @@ import java.util.Optional;
 import java.util.concurrent.CyclicBarrier;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.locks.ReentrantLock;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import ucu.utils.Hora;
 
 public class PlanificadorConsultas {
+    private static final Logger LOGGER = Logger.getLogger(PlanificadorConsultas.class.getName());
 
     private static final Hora HORA_INICIAL = new Hora(8, 0);
     private static final Hora HORA_FINAL = new Hora(20, 0);
@@ -132,29 +135,46 @@ public class PlanificadorConsultas {
         var medicos = result.medicos;
         var enfermeros = result.enfermeros;
 
-        System.out.printf("[PlanificadorConsultas] Empezando la simulación con %d hilos\n", totalHilos);
+        LOGGER.log(Level.FINER, "Empezando la simulación con {0} hilos", totalHilos);
         // TODO: Si estoy atendiendo gente sigo
         for (this.horaActual = HORA_INICIAL; !this.horaActual.equals(HORA_FINAL); this.horaActual.increment()) {
+            LOGGER.log(Level.FINEST, "");
             // digo que empezo el minuto
-            System.out.printf(
-                    "[PlanificadorConsultas] Empezó el minuto: %02d:%02d\n",
-                    this.horaActual.hora,
-                    this.horaActual.min);
+            LOGGER.log(Level.FINER,
+                    "Empezó el minuto: {0}:{1}",
+                    new Object[] {
+                            String.format("%02d", this.horaActual.hora),
+                            String.format("%02d", this.horaActual.min)
+                    });
             this.empezoElMinuto.release(totalHilos);
 
             // espero a que todos terminen
             this.terminoElMinuto.acquire(totalHilos);
-            System.out.printf(
-                    "[PlanificadorConsultas] Terminó el minuto %02d:%02d\n",
-                    this.horaActual.hora,
-                    this.horaActual.min);
+            int total = this.totalEsperando();
+            LOGGER.log(Level.FINER,
+                    "Terminó el minuto: {0}:{1} con {2} en espera",
+                    new Object[] {
+                            String.format("%02d", this.horaActual.hora),
+                            String.format("%02d", this.horaActual.min),
+                            total,
+                    });
+            LOGGER.log(Level.FINER,
+                    "Emer: {0}, Urg/Alta: {1}, Urg/Baja: {2}, Norm: {3}",
+                    new Object[] {
+                            this.consultasEmergencia.size(),
+                            this.consultasUrgenciaAlta.size(),
+                            this.consultasUrgenciaBaja.size(),
+                            this.consultasNormales.size(),
+                    });
             int n = this.terminaronTodos.getNumberWaiting();
             if (n != 0) {
-                System.err.printf("[PlanificadorConsultas] Terminaron %d hilos pero %d esperan para seguir\n",
-                        totalHilos, n);
+                LOGGER.log(Level.FINER,
+                        "Terminaron {0} hilos pero {1} esperan para seguir",
+                        new Object[] {
+                                totalHilos,
+                                n
+                        });
             }
-
-            System.out.println();
 
             // avanzo el minuto (el for)
         }
@@ -170,6 +190,16 @@ public class PlanificadorConsultas {
             t.interrupt();
             t.join();
         }
+    }
+
+    public int totalEsperando() {
+        int total = 0;
+        total += this.consultasEmergencia.size();
+        total += this.consultasUrgenciaAlta.size();
+        total += this.consultasUrgenciaBaja.size();
+        total += this.consultasNormales.size();
+
+        return total;
     }
 
     // TODO: Informar que puede estar llena y capaz trackear como resultado cuantos
@@ -251,6 +281,10 @@ public class PlanificadorConsultas {
             return Optional.of(pEmergencia);
         }
 
+        return Optional.empty();
+    }
+
+    public Optional<Paciente> conseguirPacienteNormal() {
         Paciente pUrgenciaAlta = this.consultasUrgenciaAlta.poll();
         if (pUrgenciaAlta != null) {
             return Optional.of(pUrgenciaAlta);
@@ -261,10 +295,6 @@ public class PlanificadorConsultas {
             return Optional.of(pUrgenciaBaja);
         }
 
-        return Optional.empty();
-    }
-
-    public Optional<Paciente> conseguirPacienteNormal() {
         Paciente p = this.consultasEmergencia.poll();
         if (p != null) {
             return Optional.of(p);

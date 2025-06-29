@@ -2,8 +2,12 @@ package ucu.slay;
 
 import java.util.Optional;
 import java.util.concurrent.BrokenBarrierException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 public class Medico implements Runnable {
+
+    private static final Logger LOGGER = Logger.getLogger(Medico.class.getName());
 
     private final int id;
     private Integer salaId;
@@ -22,8 +26,8 @@ public class Medico implements Runnable {
     private void runPosta() throws BrokenBarrierException, InterruptedException {
         while (true) {
             // esperar a que avance el minuto
-            System.out.printf("[Médico %d] Empezando el minuto\n", this.id);
             this.planificador.empezoElMinuto.acquire();
+            LOGGER.log(Level.FINER, "[{0}] Empezando el minuto", this.id);
 
             // me fijo que notificaciones hay (y hago lo que corresponda si pasa)
             this.conseguirPacienteNuevoSiCorresponde();
@@ -34,7 +38,7 @@ public class Medico implements Runnable {
             }
 
             // y aviso que termine
-            System.out.printf("[Médico %d] Terminando el minuto\n", this.id);
+            LOGGER.log(Level.FINER, "[{0}] Terminando el minuto", this.id);
             this.planificador.terminaronTodos.await();
             this.planificador.terminoElMinuto.release();
         }
@@ -53,11 +57,11 @@ public class Medico implements Runnable {
 
     private void conseguirPacienteNuevoSiCorresponde() throws InterruptedException {
         if (this.pacienteActual == null) {
-            System.err.printf("[Medico %d] No tengo paciente, voy a buscar uno\n", this.id);
+            LOGGER.log(Level.FINER, "[{0}] No tengo paciente, voy a buscar uno", this.id);
             this.planificador.trancarSalas();
             try {
                 if (this.planificador.salasDisponibles.isEmpty()) {
-                    System.err.printf("[Medico %d] No había sala disponible, no atiendo a nadie\n", this.id);
+                    LOGGER.log(Level.FINER, "[{0}] No había sala disponible, no atiendo a nadie", this.id);
                     // Si no tengo sala donde operar no puedo hacer nada.
                     return;
                 }
@@ -65,7 +69,7 @@ public class Medico implements Runnable {
                 int sala = this.planificador.salasDisponibles.removeLast();
                 this.planificador.salasOcupadas.put(this.id, sala);
                 this.salaId = sala;
-                System.err.printf("[Medico %d] Atiendo en sala %d\n", this.id, sala);
+                LOGGER.log(Level.FINER, "[{0}] Atiendo en sala {1}", new Object[] { this.id, sala });
             } finally {
                 this.planificador.destrancarSalas();
             }
@@ -79,19 +83,21 @@ public class Medico implements Runnable {
 
                 if (this.pacienteActual == null) {
                     // no hay nadie para atender, tengo que ceder la sala que conseguí
-                    System.err.printf("[Medico %d] No había nadie para atender, no hago nada\n", this.id);
+                    LOGGER.log(Level.FINER, "[{0}] No había nadie para atender, no hago nada\n", this.id);
                     this.planificador.trancarSalas();
                     this.liberarSala();
                     this.planificador.destrancarSalas();
                     return;
                 }
 
-                System.err.printf("[Medico %d] Atiendo a un paciente\n", this.id);
+                LOGGER.log(Level.FINER, "[{0}] Tengo paciente a atender\n", this.id);
                 // tengo que esperar a un enfermero y a una sala.
                 this.planificador.trancarEnfermeros();
                 try {
                     if (this.planificador.enfermerosDisponibles.isEmpty()) {
-                        System.err.printf("[Medico %d] No había enfermeros disponibles pero me marco ocupado\n",
+                        LOGGER.log(
+                                Level.FINER,
+                                "[{0}] No había enfermeros disponibles pero me marco ocupado",
                                 this.id);
                         // no hay nadie que me ayude, marco que necesito ayuda y sigo.
                         this.planificador.medicosEsperando += 1;
@@ -101,8 +107,7 @@ public class Medico implements Runnable {
                     Integer idEnfermero = this.planificador.enfermerosDisponibles.removeLast();
                     this.planificador.enfermerosOcupados.put(this.id, idEnfermero);
                     this.enfermeroId = idEnfermero;
-                    System.err.printf("[Medico %d] Atiendo con enfermero %d\n",
-                            this.id, idEnfermero);
+                    LOGGER.log(Level.FINER, "[{0}] Atiendo con enfermero {1}", new Object[] { this.id, idEnfermero });
                 } finally {
                     this.planificador.destrancarEnfermeros();
                 }
@@ -112,6 +117,7 @@ public class Medico implements Runnable {
             return;
         }
 
+        LOGGER.log(Level.FINER, "[{0}] Ya tengo paciente, me voy a fijar si hay emergencias", this.id);
         // Si ya tengo un paciente, pero no es emergencia, puedo interrumpirlo y poner
         // una emergencia
         if (!this.pacienteActual.consultaDeseada.esEmergencia()) {
@@ -125,9 +131,15 @@ public class Medico implements Runnable {
 
                 // no necesito esperar a un enfermero ni sala porque ya tengo uno al estar
                 // atendiendo ya un paciente
+                LOGGER.log(Level.FINER, "[{0}] Había una emergencia, la atiendo (llegó {1})",
+                        new Object[] {
+                                this.id,
+                                this.pacienteActual.id
+                        });
+            } else {
+                // Si no hay nada que me interrumpa, directamente sigo
+                LOGGER.log(Level.FINER, "[{0}] No había emergencia", this.id);
             }
-
-            // Si no hay nada que me interrumpa, directamente sigo
         }
     }
 
@@ -144,8 +156,28 @@ public class Medico implements Runnable {
     }
 
     private void atenderPaciente() throws InterruptedException {
-        pacienteActual.tiempoRestante -= 1;
+        this.pacienteActual.tiempoRestante -= 1;
+        LOGGER.log(
+                Level.FINER,
+                "[{0}] Atendiendo a {1} con {2} en {3}, quedan {4}",
+                new Object[] {
+                        this.id,
+                        this.pacienteActual.id,
+                        this.enfermeroId,
+                        this.salaId,
+                        this.pacienteActual.tiempoRestante
+                });
         if (pacienteActual.tiempoRestante == 0) {
+            LOGGER.log(
+                    Level.FINER,
+                    "[{0}] Terminé de atender a {1} liberó a {2} y sala {3}",
+                    new Object[] {
+                            this.id,
+                            this.pacienteActual.id,
+                            this.enfermeroId,
+                            this.salaId,
+                    });
+
             pacienteActual = null;
 
             this.planificador.trancarSalas();

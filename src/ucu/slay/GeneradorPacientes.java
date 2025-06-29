@@ -2,10 +2,14 @@ package ucu.slay;
 
 import java.util.Random;
 import java.util.concurrent.BrokenBarrierException;
+import java.util.logging.Level;
+import java.util.logging.Logger;
 
 import ucu.utils.Hora;
 
 public class GeneradorPacientes implements Runnable {
+    private static final Logger LOGGER = Logger.getLogger(PlanificadorConsultas.class.getName());
+
     // Should be in [0,1]
     private static final double MAX_TIME_VARIANCE = 0.5;
 
@@ -13,6 +17,7 @@ public class GeneradorPacientes implements Runnable {
     private final Random random;
     private final int cantInicialPacientes;
     private final int pacientesPorHora;
+    private int currentId;
     private PlanificadorConsultas planificador;
 
     public GeneradorPacientes(
@@ -26,6 +31,7 @@ public class GeneradorPacientes implements Runnable {
         this.random = new Random(this.semilla);
         this.pacientesPorHora = pacientesPorHora;
         this.cantInicialPacientes = cantInicialPacientes;
+        this.currentId = 1;
 
         for (int i = 0; i < this.cantInicialPacientes; ++i) {
             this.generarPaciente();
@@ -63,6 +69,7 @@ public class GeneradorPacientes implements Runnable {
         p.tiempoRestante = p.consultaDeseada.getTiempoEstimado();
         double variance = this.random.nextDouble(-MAX_TIME_VARIANCE, MAX_TIME_VARIANCE);
         p.tiempoRestante += p.tiempoRestante * variance;
+        p.id = this.currentId++;
 
         char nivel = '%';
         if (p.consultaDeseada.esEmergencia()) {
@@ -73,7 +80,7 @@ public class GeneradorPacientes implements Runnable {
             nivel = 'N';
         }
 
-        System.out.printf("[GeneradorPacientes] Generando paciente (%c) %dmin\n", nivel, p.tiempoRestante);
+        LOGGER.log(Level.FINER, "Generado paciente [{0}] ({1}) {2}min", new Object[] { p.id, nivel, p.tiempoRestante });
         this.planificador.trancarColas();
         this.planificador.recibirPaciente(p);
         this.planificador.destrancarColas();

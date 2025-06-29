@@ -4,6 +4,7 @@ public class Paciente {
     // Lo que quiere ir a hacer el pana.
     public TipoConsulta consultaDeseada;
 
-    public int tiempoRestante = -1;
-    public int tiempoDesdeLlegada = -1;
+    public int tiempoRestante;
+    public int tiempoDesdeLlegada;
+    public int id;
 }
