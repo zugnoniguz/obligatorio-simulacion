@@ -8,7 +8,7 @@ import java.util.logging.Logger;
 import ucu.utils.Hora;
 
 public class GeneradorPacientes implements Runnable {
-    private static final Logger LOGGER = Logger.getLogger(PlanificadorConsultas.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(GeneradorPacientes.class.getName());
 
     // Should be in [0,1]
     private static final double MAX_TIME_VARIANCE = 0.5;

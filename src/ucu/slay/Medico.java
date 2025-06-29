@@ -148,6 +148,7 @@ public class Medico implements Runnable {
             // emergencia
             Optional<Paciente> p = this.planificador.conseguirPacienteInterruptor();
             if (p.isPresent()) {
+                this.pacienteActual.interrumpido = true;
                 this.planificador.recibirPacienteDeSala(this.pacienteActual);
                 this.pacienteActual = p.orElseThrow();
 

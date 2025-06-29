@@ -85,7 +85,7 @@ public class App {
             BufferedWriter writer = new BufferedWriter(new FileWriter(csvFile));
             try {
                 writer.write(
-                        "Hora de entrada, Hora de Salida,Tiempo esperado de atención,Tiempo real de atención,Tiempo de espera,Tiempo total\n");
+                        "Hora de entrada,Hora de Salida,Fue interrumpido,Tiempo esperado de atención,Tiempo real de atención,Tiempo de espera,Tiempo total\n");
                 ArrayList<Paciente> newList = (ArrayList<Paciente>) stats.pacientesTerminados.clone();
                 newList.sort(new Comparator<Paciente>() {
                     @Override
@@ -98,9 +98,10 @@ public class App {
                     for (int i = 0; i < p.tiempoDesdeLlegada; ++i) {
                         horaSalida.increment();
                     }
-                    String s = String.format("%s,%s,%d,%d,%d,%d",
+                    String s = String.format("%s,%s,%s,%d,%d,%d,%d",
                             p.horaLlegada,
                             horaSalida,
+                            p.interrumpido ? "Sí" : "No",
                             p.consultaDeseada.getTiempoEstimado(),
                             p.tiempoDeAtencion,
                             p.tiempoDesdeLlegada - p.tiempoDeAtencion,
