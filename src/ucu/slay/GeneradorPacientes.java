@@ -18,12 +18,14 @@ public class GeneradorPacientes implements Runnable {
     private final int cantInicialPacientes;
     private final int pacientesPorHora;
     private int currentId;
+    private final Consulta[] consultas;
     private PlanificadorConsultas planificador;
 
     public GeneradorPacientes(
             int semilla,
             int cantInicialPacientes,
             int pacientesPorHora,
+            Consulta[] consultas,
             PlanificadorConsultas planificador) {
         this.planificador = planificador;
 
@@ -31,6 +33,7 @@ public class GeneradorPacientes implements Runnable {
         this.random = new Random(this.semilla);
         this.pacientesPorHora = pacientesPorHora;
         this.cantInicialPacientes = cantInicialPacientes;
+        this.consultas = consultas;
         this.currentId = 1;
     }
 
@@ -65,20 +68,24 @@ public class GeneradorPacientes implements Runnable {
     }
 
     public void generarPaciente() {
-        int idx = this.random.nextInt(TipoConsulta.getCount());
-        TipoConsulta consulta = TipoConsulta.fromIdx(idx);
+        int idx = this.random.nextInt(consultas.length);
+        Consulta consulta = consultas[idx];
         int id = this.currentId++;
-        int tiempoRestante = consulta.getTiempoEstimado();
+        int tiempoRestante = consulta.tiempoEstimado;
         tiempoRestante *= 1 + this.random.nextDouble(-MAX_TIME_VARIANCE, MAX_TIME_VARIANCE);
         Paciente p = new Paciente(id, consulta, this.planificador.horaActual.clone(), tiempoRestante);
 
         char nivel = '%';
-        if (p.consultaDeseada.esEmergencia()) {
-            nivel = 'E';
-        } else if (p.consultaDeseada.esUrgencia()) {
-            nivel = 'U';
-        } else {
-            nivel = 'N';
+        switch (p.consultaDeseada.tipo) {
+            case TipoConsulta.Emergencia -> {
+                nivel = 'E';
+            }
+            case TipoConsulta.Urgencia -> {
+                nivel = 'U';
+            }
+            case TipoConsulta.Normal -> {
+                nivel = 'N';
+            }
         }
 
         LOGGER.log(

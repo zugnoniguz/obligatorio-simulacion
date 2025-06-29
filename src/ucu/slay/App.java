@@ -102,7 +102,7 @@ public class App {
                             p.horaLlegada,
                             horaSalida,
                             p.interrumpido ? "Sí" : "No",
-                            p.consultaDeseada.getTiempoEstimado(),
+                            p.consultaDeseada.tiempoEstimado,
                             p.tiempoDeAtencion,
                             p.tiempoDesdeLlegada - p.tiempoDeAtencion,
                             p.tiempoDesdeLlegada);

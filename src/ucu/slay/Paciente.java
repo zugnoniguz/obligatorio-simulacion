@@ -4,14 +4,14 @@ import ucu.utils.Hora;
 
 public class Paciente {
     public final int id;
-    public final TipoConsulta consultaDeseada;
+    public final Consulta consultaDeseada;
     public int tiempoRestante;
     public int tiempoDeAtencion;
     public int tiempoDesdeLlegada;
     public boolean interrumpido;
     public final Hora horaLlegada;
 
-    public Paciente(int id, TipoConsulta consultaDeseada, Hora horaLlegada, int tiempoRestante) {
+    public Paciente(int id, Consulta consultaDeseada, Hora horaLlegada, int tiempoRestante) {
         this.id = id;
         this.consultaDeseada = consultaDeseada;
         this.horaLlegada = horaLlegada;

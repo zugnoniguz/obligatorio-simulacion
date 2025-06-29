@@ -2,14 +2,13 @@ semilla = 69420
 
 cantMedicos = 2
 cantEnfermeros = 2
-cantSalas = 2;
+cantSalas = 2
 
 cantInicialPacientes = 2
-
 pacientesPorHora = 6
 
-consulta = dermatología
-consulta = pediatría
-consulta = parto
+consulta = dermatología,normal,10
+consulta = pediatría,urgencia,10
+consulta = parto,emergencia,20
 
 existeSalaReservada = false

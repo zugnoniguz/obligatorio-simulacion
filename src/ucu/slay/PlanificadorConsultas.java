@@ -102,6 +102,7 @@ public class PlanificadorConsultas {
                         config.semilla,
                         config.cantInicialPacientes,
                         config.pacientesPorHora,
+                        config.tiposConsulta,
                         this));
         hiloGenerador.start();
         totalHilos += 1;
@@ -240,24 +241,32 @@ public class PlanificadorConsultas {
             return;
         }
 
-        if (p.consultaDeseada.esEmergencia()) {
-            this.consultasEmergencia.add(p);
-        } else if (p.consultaDeseada.esUrgencia()) {
-            // TODO: Es alta o baja?
-            this.consultasUrgenciaBaja.add(p);
-        } else {
-            this.consultasNormales.add(p);
+        switch (p.consultaDeseada.tipo) {
+            case TipoConsulta.Emergencia -> {
+                this.consultasEmergencia.addLast(p);
+            }
+            case TipoConsulta.Urgencia -> {
+                // TODO: Es alta o baja?
+                this.consultasUrgenciaBaja.addLast(p);
+            }
+            case TipoConsulta.Normal -> {
+                this.consultasNormales.addLast(p);
+            }
         }
     }
 
     public void recibirPacienteDeSala(Paciente p) {
-        if (p.consultaDeseada.esEmergencia()) {
-            this.consultasEmergencia.addLast(p);
-        } else if (p.consultaDeseada.esUrgencia()) {
-            // TODO: Es alta o baja?
-            this.consultasUrgenciaBaja.addLast(p);
-        } else {
-            this.consultasNormales.addLast(p);
+        switch (p.consultaDeseada.tipo) {
+            case TipoConsulta.Emergencia -> {
+                this.consultasEmergencia.addFirst(p);
+            }
+            case TipoConsulta.Urgencia -> {
+                // TODO: Es alta o baja?
+                this.consultasUrgenciaBaja.addFirst(p);
+            }
+            case TipoConsulta.Normal -> {
+                this.consultasNormales.addFirst(p);
+            }
         }
     }
 

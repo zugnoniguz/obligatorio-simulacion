@@ -141,7 +141,7 @@ public class Medico implements Runnable {
     private void verificarEmergencia() throws InterruptedException {
         // Si ya tengo un paciente, pero no es emergencia, puedo interrumpirlo y poner
         // una emergencia
-        if (!this.pacienteActual.consultaDeseada.esEmergencia()) {
+        if (this.pacienteActual.consultaDeseada.tipo != TipoConsulta.Emergencia) {
             LOGGER.log(Level.FINER, "[{0}] Tengo paciente no emergencia, me voy a fijar si hay emergencias", this.id);
 
             // Solo me importa si hay pacientes nuevos si ya no estoy atendiendo una

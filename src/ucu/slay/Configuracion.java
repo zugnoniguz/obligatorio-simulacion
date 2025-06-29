@@ -14,7 +14,7 @@ public class Configuracion {
     // Cantidad de pacientes que llegan por hora y motivo por el que vienen.
     // Cantidad de tiempo que demora en atender al paciente por especialidad.
     public final int pacientesPorHora;
-    public final TipoConsulta[] tiposConsulta;
+    public final Consulta[] tiposConsulta;
 
     // Indicador si existe sala reservada por emergencia.
     public final boolean existeSalaReservada;
@@ -27,7 +27,7 @@ public class Configuracion {
             int semilla,
             int cantInicialPacientes,
             int pacientesPorHora,
-            TipoConsulta[] tiposConsulta,
+            Consulta[] tiposConsulta,
             boolean existeSalaReservada,
             int cantMedicos,
             int cantEnfermeros,
@@ -48,7 +48,7 @@ public class Configuracion {
         Integer semilla = null;
         Integer cantInicialPacientes = null;
         Integer pacientesPorHora = null;
-        ArrayList<TipoConsulta> consultas = null;
+        ArrayList<Consulta> consultas = null;
         Boolean existeSalaReservada = null;
         Integer cantMedicos = null;
         Integer cantEnfermeros = null;
@@ -93,8 +93,12 @@ public class Configuracion {
                         consultas = new ArrayList<>();
                     }
 
-                    TipoConsulta tipo = TipoConsulta.fromString(rest.trim());
-                    consultas.add(tipo);
+                    String[] vals = rest.trim().split(",");
+                    String nombre = vals[0].trim();
+                    TipoConsulta tipo = TipoConsulta.fromString(vals[1].trim());
+                    int tiempoEstimado = Integer.valueOf(vals[2].trim());
+                    Consulta cons = new Consulta(nombre, tipo, tiempoEstimado);
+                    consultas.add(cons);
                 }
                 case "existeSalaReservada" -> {
                     if (existeSalaReservada != null) {
@@ -174,7 +178,7 @@ public class Configuracion {
                 semilla,
                 cantInicialPacientes,
                 pacientesPorHora,
-                consultas.toArray(TipoConsulta[]::new),
+                consultas.toArray(Consulta[]::new),
                 existeSalaReservada,
                 cantMedicos,
                 cantEnfermeros,
