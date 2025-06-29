@@ -21,6 +21,8 @@ public class Enfermero implements Runnable {
             this.planificador.empezoElMinuto.acquire();
             LOGGER.log(Level.FINER, "[{0}] Empezando el minuto", this.id);
 
+            // TODO: Atender pacientes
+            // TODO: Si hay emergencia estoy libre.
             this.atenderPaciente();
 
             // y aviso que termine

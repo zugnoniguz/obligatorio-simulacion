@@ -63,13 +63,10 @@ public class GeneradorPacientes implements Runnable {
     public void generarPaciente() {
         int idx = this.random.nextInt(TipoConsulta.getCount());
         TipoConsulta consulta = TipoConsulta.fromIdx(idx);
-        Paciente p = new Paciente();
-        p.consultaDeseada = consulta;
-        p.tiempoDesdeLlegada = 0;
-        p.tiempoRestante = p.consultaDeseada.getTiempoEstimado();
-        double variance = this.random.nextDouble(-MAX_TIME_VARIANCE, MAX_TIME_VARIANCE);
-        p.tiempoRestante += p.tiempoRestante * variance;
-        p.id = this.currentId++;
+        int id = this.currentId++;
+        int tiempoRestante = consulta.getTiempoEstimado();
+        tiempoRestante *= 1 + this.random.nextDouble(-MAX_TIME_VARIANCE, MAX_TIME_VARIANCE);
+        Paciente p = new Paciente(id, consulta, this.planificador.horaActual, tiempoRestante);
 
         char nivel = '%';
         if (p.consultaDeseada.esEmergencia()) {

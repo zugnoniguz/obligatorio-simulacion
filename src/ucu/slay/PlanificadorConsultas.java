@@ -22,8 +22,6 @@ public class PlanificadorConsultas {
 
     // La tranca para acceder a todas las colas
     private final ReentrantLock mutexColas;
-    private final ReentrantLock mutexEnfermeros;
-    private final ReentrantLock mutexSalas;
     // Las emergencias no tienen prioridad. Las atendemos y listo.
     private final ArrayDeque<Paciente> consultasEmergencia;
     // Las urgencias tienen proridad entre sí, según cuanto tiempo van sin ser
@@ -38,10 +36,17 @@ public class PlanificadorConsultas {
     public int medicosEsperando;
     public CyclicBarrier terminaronTodos;
     public Hora horaActual;
+
+    private final ReentrantLock mutexEnfermeros;
     public ArrayList<Integer> enfermerosDisponibles;
     public HashMap<Integer, Integer> enfermerosOcupados;
+
+    private final ReentrantLock mutexSalas;
     public ArrayList<Integer> salasDisponibles;
     public HashMap<Integer, Integer> salasOcupadas;
+
+    public ReentrantLock statsLock;
+    public Stats stats;
 
     public PlanificadorConsultas(Configuracion config) {
         this.config = config;
@@ -60,6 +65,9 @@ public class PlanificadorConsultas {
         this.enfermerosOcupados = new HashMap<>();
         this.salasDisponibles = new ArrayList<>();
         this.salasOcupadas = new HashMap<>();
+
+        this.stats = new Stats();
+        this.statsLock = new ReentrantLock();
 
         this.empezoElMinuto = new Semaphore(0);
         this.terminoElMinuto = new Semaphore(0);
@@ -175,6 +183,11 @@ public class PlanificadorConsultas {
                                 n
                         });
             }
+
+            // TODO: Promover urgencias
+            this.envejecerPacientes();
+
+            this.actualizarStats();
 
             // avanzo el minuto (el for)
         }
@@ -311,5 +324,38 @@ public class PlanificadorConsultas {
     public void aumentarPrioridadUrgencia(Paciente p) {
         this.consultasUrgenciaBaja.remove(p);
         this.consultasUrgenciaAlta.add(p);
+    }
+
+    private void envejecerPacientes() {
+        for (Paciente p : this.consultasEmergencia) {
+            p.tiempoDesdeLlegada += 1;
+        }
+
+        for (Paciente p : this.consultasUrgenciaAlta) {
+            p.tiempoDesdeLlegada += 1;
+        }
+
+        for (Paciente p : this.consultasUrgenciaBaja) {
+            p.tiempoDesdeLlegada += 1;
+        }
+
+        for (Paciente p : this.consultasNormales) {
+            p.tiempoDesdeLlegada += 1;
+        }
+    }
+
+    private void actualizarStats() {
+        this.statsLock.lock();
+        try {
+            this.stats.pacientesEsperando.put(this.horaActual,
+                    new Integer[] {
+                            this.consultasEmergencia.size(),
+                            this.consultasUrgenciaAlta.size(),
+                            this.consultasUrgenciaBaja.size(),
+                            this.consultasNormales.size()
+                    });
+        } finally {
+            this.statsLock.unlock();
+        }
     }
 }

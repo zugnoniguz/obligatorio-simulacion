@@ -241,7 +241,15 @@ public class Medico implements Runnable {
                             this.salaId,
                     });
 
-            pacienteActual = null;
+            this.planificador.statsLock.lock();
+            if (this.planificador.stats.pacientesAtendidos.containsKey(this.planificador.horaActual)) {
+                int curr = this.planificador.stats.pacientesAtendidos.get(this.planificador.horaActual);
+                this.planificador.stats.pacientesAtendidos.put(this.planificador.horaActual, curr + 1);
+            } else {
+                this.planificador.stats.pacientesAtendidos.put(this.planificador.horaActual, 1);
+            }
+            this.planificador.stats.pacientesTerminados.add(this.pacienteActual);
+            this.planificador.statsLock.unlock();
 
             this.planificador.trancarSalas();
             this.liberarSala();
@@ -250,6 +258,8 @@ public class Medico implements Runnable {
             this.planificador.trancarEnfermeros();
             this.liberarEnfermero();
             this.planificador.destrancarEnfermeros();
+
+            this.pacienteActual = null;
         }
     }
 }
