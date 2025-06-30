@@ -31,20 +31,25 @@ public class PlanificadorConsultas {
     private final ArrayDeque<Paciente> consultasUrgenciaBaja;
     // Entre las consultas normales, tampoco hay prioridad.
     private final ArrayDeque<Paciente> consultasNormales;
+    private final ArrayDeque<Paciente> consultasEnfermeria;
 
     public final Semaphore empezoElMinuto;
     public final Semaphore terminoElMinuto;
     public int medicosEsperando;
+    public int medicosEsperandoEmergencia;
     public CyclicBarrier terminaronTodos;
     public Hora horaActual;
 
     private final ReentrantLock mutexEnfermeros;
     public ArrayList<Integer> enfermerosDisponibles;
-    public HashMap<Integer, Integer> enfermerosOcupados;
+    public ArrayList<Integer> enfermerosOcupadosSolos;
+    public HashMap<Integer, Integer> enfermerosOcupadosConMedico;
 
     private final ReentrantLock mutexSalas;
     public ArrayList<Integer> salasDisponibles;
     public HashMap<Integer, Integer> salasOcupadas;
+    public ArrayList<Integer> salasDisponiblesEnfermero;
+    public HashMap<Integer, Integer> salasOcupadasEnfermero;
 
     public ReentrantLock statsLock;
     public Stats stats;
@@ -56,6 +61,7 @@ public class PlanificadorConsultas {
         this.consultasUrgenciaAlta = new ArrayDeque<>();
         this.consultasUrgenciaBaja = new ArrayDeque<>();
         this.consultasNormales = new ArrayDeque<>();
+        this.consultasEnfermeria = new ArrayDeque<>();
 
         this.mutexColas = new ReentrantLock();
         this.mutexEnfermeros = new ReentrantLock();
@@ -63,9 +69,11 @@ public class PlanificadorConsultas {
 
         this.medicosEsperando = 0;
         this.enfermerosDisponibles = new ArrayList<>();
-        this.enfermerosOcupados = new HashMap<>();
+        this.enfermerosOcupadosConMedico = new HashMap<>();
         this.salasDisponibles = new ArrayList<>();
         this.salasOcupadas = new HashMap<>();
+        this.salasDisponiblesEnfermero = new ArrayList<>();
+        this.salasOcupadasEnfermero = new HashMap<>();
 
         this.stats = new Stats();
         this.statsLock = new ReentrantLock();
@@ -127,6 +135,10 @@ public class PlanificadorConsultas {
         this.terminaronTodos = new CyclicBarrier(totalHilos);
         for (int i = 0; i < config.cantSalas; ++i) {
             this.salasDisponibles.add(i + 1);
+        }
+
+        for (int i = 0; i < config.cantSalas; ++i) {
+            this.salasDisponiblesEnfermero.add(i + 1);
         }
 
         return new InitResult(
@@ -249,6 +261,9 @@ public class PlanificadorConsultas {
             case TipoConsulta.Normal -> {
                 this.consultasNormales.addLast(p);
             }
+            case TipoConsulta.Enfermeria -> {
+                this.consultasEnfermeria.addLast(p);
+            }
         }
     }
 
@@ -267,17 +282,10 @@ public class PlanificadorConsultas {
             case TipoConsulta.Normal -> {
                 this.consultasNormales.addFirst(p);
             }
-        }
-    }
-
-    public boolean enfermeroOcupado(Integer idEnfermero) {
-        for (int i : this.enfermerosOcupados.values()) {
-            if (idEnfermero.equals(i)) {
-                return true;
+            case TipoConsulta.Enfermeria -> {
+                this.consultasEnfermeria.addFirst(p);
             }
         }
-
-        return false;
     }
 
     public void trancarColas() {
@@ -344,6 +352,19 @@ public class PlanificadorConsultas {
         }
 
         return Optional.empty();
+    }
+
+    public Optional<Paciente> conseguirPacienteEnfermeria() {
+        Paciente pEnfermeria = this.consultasEnfermeria.poll();
+        if (pEnfermeria != null) {
+            return Optional.of(pEnfermeria);
+        }
+
+        return Optional.empty();
+    }
+
+    public boolean hayMedicosEsperando() {
+        return this.medicosEsperando > 0 || this.medicosEsperandoEmergencia > 0;
     }
 
     private void envejecerPacientes() {

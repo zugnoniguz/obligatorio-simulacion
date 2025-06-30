@@ -121,12 +121,16 @@ public class Medico implements Runnable {
                             "[{0}] No había enfermeros disponibles pero me marco ocupado",
                             this.id);
                     // no hay nadie que me ayude, marco que necesito ayuda y sigo.
-                    this.planificador.medicosEsperando += 1;
+                    if (this.pacienteActual.consultaDeseada.tipo == TipoConsulta.Emergencia) {
+                        this.planificador.medicosEsperandoEmergencia += 1;
+                    } else {
+                        this.planificador.medicosEsperando += 1;
+                    }
                     return;
                 }
 
                 Integer idEnfermero = this.planificador.enfermerosDisponibles.removeFirst();
-                this.planificador.enfermerosOcupados.put(this.id, idEnfermero);
+                this.planificador.enfermerosOcupadosConMedico.put(this.id, idEnfermero);
                 this.enfermeroId = idEnfermero;
                 LOGGER.log(Level.FINER, "[{0}] Atiendo con enfermero {1}", new Object[] { this.id, idEnfermero });
             } finally {
@@ -183,9 +187,13 @@ public class Medico implements Runnable {
             }
 
             Integer idEnfermero = this.planificador.enfermerosDisponibles.removeFirst();
-            this.planificador.enfermerosOcupados.put(this.id, idEnfermero);
+            this.planificador.enfermerosOcupadosConMedico.put(this.id, idEnfermero);
             this.enfermeroId = idEnfermero;
-            this.planificador.medicosEsperando -= 1;
+            if (this.pacienteActual.consultaDeseada.tipo == TipoConsulta.Emergencia) {
+                this.planificador.medicosEsperandoEmergencia -= 1;
+            } else {
+                this.planificador.medicosEsperando -= 1;
+            }
             LOGGER.log(Level.FINER, "[{0}] Atiendo con enfermero {1}", new Object[] { this.id, idEnfermero });
         } finally {
             this.planificador.destrancarEnfermeros();
@@ -215,7 +223,7 @@ public class Medico implements Runnable {
     }
 
     private void liberarEnfermero() {
-        int enfermeroId = this.planificador.enfermerosOcupados.remove(this.id);
+        int enfermeroId = this.planificador.enfermerosOcupadosConMedico.remove(this.id);
         this.planificador.enfermerosDisponibles.add(enfermeroId);
         this.enfermeroId = null;
     }

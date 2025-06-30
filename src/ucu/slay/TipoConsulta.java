@@ -5,7 +5,8 @@ import java.text.Normalizer;
 public enum TipoConsulta {
     Emergencia,
     Urgencia,
-    Normal;
+    Normal,
+    Enfermeria;
 
     public static TipoConsulta fromString(String s) {
         s = Normalizer.normalize(s, Normalizer.Form.NFD);
