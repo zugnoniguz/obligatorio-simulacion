@@ -17,6 +17,7 @@ public class PlanificadorConsultas {
 
     public static final Hora HORA_INICIAL = new Hora(8, 0);
     public static final Hora HORA_FINAL = new Hora(20, 0);
+    public static final int VEJEZ_MAX_URGENCIA_BAJA = 30; // 30 minutos
 
     private final Configuracion config;
 
@@ -180,7 +181,6 @@ public class PlanificadorConsultas {
                         });
             }
 
-            // TODO: Promover urgencias
             this.envejecerPacientes();
 
             this.actualizarStats();
@@ -232,9 +232,6 @@ public class PlanificadorConsultas {
         return total;
     }
 
-    // TODO: Informar que puede estar llena y capaz trackear como resultado cuantos
-    // pacientes no pueden entrar en la sala
-    // de espera
     public void recibirPaciente(Paciente p) {
         if (this.horaActual.compareTo(PlanificadorConsultas.HORA_FINAL) >= 0) {
             LOGGER.log(Level.FINER, "Ignorando paciente porque cerró el hospital");
@@ -246,7 +243,7 @@ public class PlanificadorConsultas {
                 this.consultasEmergencia.addLast(p);
             }
             case TipoConsulta.Urgencia -> {
-                // TODO: Es alta o baja?
+                // Si recien llega no puede ser urgencia de alta prioridad.
                 this.consultasUrgenciaBaja.addLast(p);
             }
             case TipoConsulta.Normal -> {
@@ -261,8 +258,11 @@ public class PlanificadorConsultas {
                 this.consultasEmergencia.addFirst(p);
             }
             case TipoConsulta.Urgencia -> {
-                // TODO: Es alta o baja?
-                this.consultasUrgenciaBaja.addFirst(p);
+                if (p.tiempoDesdeLlegada >= VEJEZ_MAX_URGENCIA_BAJA) {
+                    this.consultasUrgenciaAlta.addFirst(p);
+                } else {
+                    this.consultasUrgenciaBaja.addFirst(p);
+                }
             }
             case TipoConsulta.Normal -> {
                 this.consultasNormales.addFirst(p);
@@ -346,11 +346,6 @@ public class PlanificadorConsultas {
         return Optional.empty();
     }
 
-    public void aumentarPrioridadUrgencia(Paciente p) {
-        this.consultasUrgenciaBaja.remove(p);
-        this.consultasUrgenciaAlta.add(p);
-    }
-
     private void envejecerPacientes() {
         for (Paciente p : this.consultasEmergencia) {
             p.tiempoDesdeLlegada += 1;
@@ -366,6 +361,13 @@ public class PlanificadorConsultas {
 
         for (Paciente p : this.consultasNormales) {
             p.tiempoDesdeLlegada += 1;
+        }
+
+        for (Paciente p : this.consultasUrgenciaBaja) {
+            if (p.tiempoDesdeLlegada > VEJEZ_MAX_URGENCIA_BAJA) {
+                this.consultasUrgenciaBaja.remove(p);
+                this.consultasUrgenciaAlta.add(p);
+            }
         }
     }
 
