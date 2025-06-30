@@ -1,0 +1,326 @@
+cant_hilos = 3 // la cantidad de hilos total
+
+mutex_colas = mutex(libre)
+cola_emergencia = cola
+cola_urgenciaalta = cola
+cola_urgenciabaja = cola
+cola_normal = cola
+cola_enfermero = cola
+
+mutex_enfermeros = mutex(libre)
+enfermeros_disponibles = array de ids de enfermeros
+medicos_esperando = int
+medicos_esperando_emergencia = int
+
+mutex_salas = mutex(libre)
+salas_disponibles = array de ids de salas
+
+empezo_minuto = semaforo(0)
+termino_minuto = semaforo(0)
+// una barrera tiene un metodo wait que libera a los hilos si y solo si hay N hilos esperando en el metodo wait
+terminaron_todos = barrera(cant_hilos)
+
+hora_min = 0 // variable que indica el minuto de la hora actual
+hora_hora = 0 // variable que indica la hora de la hora actual
+
+
+medico:
+	id_medico = algun int // variable de cada médico que indica su id
+	id_enfermero = null // variable de cada médico que indica la id del enfermero que lo ayuda, si tiene
+	id_sala = null // variable de cada médico
+	paciente_medico = null // variable de cada médico que indica qué paciente está atendiendo ahora mismo
+
+	while true then
+		empezo_minuto.acquire()
+
+		if paciente_medico == null then
+			mutex_salas.lock()
+			nueva_sala = planificador.conseguir_sala()
+			mutex_salas.unlock()
+
+			if nueva_sala != null then
+				mutex_colas.lock()
+					nuevo_paciente = planificador.conseguir_paciente()
+					if nuevo_paciente != null then
+						paciente_medico = nuevo_paciente
+						mutex_enfermeros.lock()
+						enfermero = planificador.conseguir_enfermero()
+						if enfermero == null then
+							if paciente_medico.esEmergencia() then
+								planificador.marcar_para_enfermero(id_medico)
+							else
+								planificador.marcar_para_enfermero_emergencia(id_medico)
+							end if
+						else
+							id_enfermero = enfermero
+						end if
+						mutex_enfermeros.unlock()
+					else
+						mutex_salas.lock()
+						planificador.devolver_sala(nueva_sala)
+						mutex_salas.unlock()
+					end if
+				mutex_colas.unlock()
+			end if
+		else if ! paciente_medico.esEmergencia() then
+			mutex_colas.lock()
+				nuevo_paciente = planificador.conseguir_paciente_emergencia()
+				if nuevo_paciente != null then
+					planificador.add_paciente_a_sala(paciente_medico)
+					paciente_medico = nuevo_paciente
+				end if
+			mutex_colas.unlock()
+		end if
+
+		if paciente_medico != null then
+			if ! tengo_enfermero then
+				mutex_enfermeros.lock()
+				enfermero = planificador.conseguir_enfermero()
+				if enfermero != null then
+					id_enfermero = enfermero
+					if paciente_medico.esEmergencia() then
+						planificador.desmarcar_para_enfermero(id_medico)
+					else
+						planificador.desmarcar_para_enfermero_emergencia(id_medico)
+					end if
+				end if
+				mutex_enfermeros.unlock()
+			end if
+		end if
+
+		if paciente_medico != null and enfermero != null then
+			// atiendo al paciente (subo el tiempo de atención y tiempo total del paciente)
+			if paciente.terminoAtencion() then
+				mutex_salas.lock()
+				planificador.devolver_sala(sala)
+				sala = null
+				mutex_salas.unlock()
+
+				mutex_enfermeros.lock()
+				planificador.devolver_enfermero(id_enfermero)
+				sala = null
+				mutex_enfermeros.unlock()
+			end if
+		end if
+
+		terminaron_todos.wait()
+		termino_minuto.release()
+
+	end while
+
+
+enfermero:
+	id_enfermero = null // variable de cada médico que indica la id del enfermero que lo ayuda, si tiene
+	id_sala = null // variable de cada médico
+	paciente_enfermero = null // variable de cada médico que indica qué paciente está atendiendo ahora mismo
+
+	while true then
+		empezo_minuto.acquire()
+
+		disponible = true
+		mutex_enfermeros.lock()
+		if paciente_enfermero == null then
+			disponible = planificador.enfermero_disponible(id_enfermero)
+			if disponible then
+				if planificador.hay_medicos_esperando() then
+					disponible = false
+				else
+					planificador.marcar_enfermero_ocupado(id_enfermero)
+				end if
+			end if
+		else then
+			if planificador.hay_medicos_esperando_emergencia() then
+				planificador.add_paciente_a_sala(paciente_enfermero)
+				paciente_enfermero = null
+				planificador.devolver_enfermero(id_enfermero)
+				disponible = false
+
+				mutex_salas.lock()
+				planificador.devolver_sala_enfermero(id_sala)
+				id_sala = null
+				mutex_salas.unlock()
+			end if
+		end if
+		mutex_enfermeros.unlock()
+
+		if disponible then
+			if paciente_enfermero == null then
+				mutex_salas.lock()
+				nueva_sala = planificador.conseguir_sala_enfermero()
+				mutex_salas.unlock()
+
+				if nueva_sala != null then
+					mutex_colas.lock()
+					nuevo_paciente = planificador.conseguir_paciente_enfermero()
+					if nuevo_paciente != null then
+						paciente_enfermero = nuevo_paciente
+					else
+						mutex_salas.lock()
+						planificador.devolver_sala_enfermero(nueva_sala)
+						mutex_salas.unlock()
+
+						mutex_enfermeros.lock()
+						planificador.devolver_enfermero(id_enfermero)
+						mutex_enfermeros.unlock()
+					end if
+					mutex_colas.unlock()
+				end if
+			else then
+				// atiendo al paciente (subo el tiempo de atención y tiempo total del paciente)
+				if paciente.terminoAtencion() then
+					mutex_salas.lock()
+					planificador.devolver_sala(sala)
+					sala = null
+					mutex_salas.unlock()
+
+					mutex_enfermeros.lock()
+					planificador.devolver_enfermero(id_enfermero)
+					sala = null
+					mutex_enfermeros.unlock()
+				end if
+			end if
+
+		terminaron_todos.wait()
+		termino_minuto.release()
+	end while
+
+planificador:
+	init_simulacion()
+
+	while hora != 20:00 then
+		empezo_minuto.release(cant_hilos)
+
+		termino_minuto.acquire(cant_hilos)
+
+		hora += 1 // aumenta min y hora
+
+		envejecer_pacientes()
+	end while
+
+	conseguir_sala():
+		return salas.removeLast()
+
+	devolver_sala(sala):
+		salas.addLast(sala)
+
+	conseguir_paciente():
+		if cola_emergencia.notEmpty() then
+			return cola_emergencia.pop()
+		else if cola_urgenciaalta.notEmpty() then
+			return cola_urgenciaaalta.pop()
+		else if cola_urgenciabaja.notEmpty() then
+			return cola_urgenciabaja.pop()
+		else if cola_normal.notEmpty() then
+			return cola_normal.pop()
+		else
+			return null
+		end if
+
+	conseguir_paciente_emergencia():
+		if cola_emergencia.notEmpty() then
+			return cola_emergencia.pop()
+		else then
+			return null
+		end if
+
+	conseguir_paciente_enfermero():
+		if cola_enfermero.notEmpty() then
+			return cola_enfermero.pop()
+		else then
+			return null
+		end if
+
+	add_paciente(paciente):
+		if paciente.esEmergencia() then
+			cola_emergencia.add(paciente)
+		else if paciente.esUrgencia() then
+			cola_urgenciabaja.add(paciente)
+		else then
+			cola_normal.add(paciente)
+		end if
+
+	add_paciente_a_sala(paciente):
+		if paciente.esEmergencia() then
+			cola_emergencia.addFirst(paciente)
+		else if paciente.esUrgencia() then
+			if paciente.pasoMuchoTiempo() then
+				cola_urgenciaalta.addFirst(paciente)
+			else
+				cola_urgenciabaja.addFirst(paciente)
+			end if
+		else then
+			cola_normal.addFirst(paciente)
+		end if
+
+	conseguir_enfermero():
+		if enfermeros_disponibles.notEmpty() then
+			return enfermeros_disponibles.removeLast()
+		else
+			return null
+		end if
+
+	marcar_enfermero_ocupado(id_enfermero):
+		enfermeros_disponibles.remove(id_enfermero)
+
+	devolver_enfermero(id_enfermero):
+		enfermeros_disponibles.add(id_enfermero)
+
+	enfermero_disponible(id_enfermero):
+		for id in enfermeros_disponibles then
+			if id_enfermero == id then
+				return true
+			end if
+		end for
+
+		return false
+
+	hay_medicos_esperando():
+		return medicos_esperando > 0 or medicos_esperando_emergencia > 0
+
+	marcar_para_enfermero(id_medico):
+		medicos_esperando += 1
+
+	desmarcar_para_enfermero(id_medico):
+		medicos_esperando -= 1
+
+	marcar_para_enfermero_emergencia(id_medico):
+		medicos_esperando += 1
+
+	desmarcar_para_enfermero_emergencia(id_medico):
+		medicos_esperando -= 1
+
+
+generador:
+	semilla = 69 // variable de generador que determina la semilla del generador de numeros aleatorios
+	random = random(69) // variable de generador que genera numeros aleatorios
+	cantidad_por_hora = 5 // variable de generador que determina cuantos pacientes generar por hora
+	pacientes_iniciales = 5 // variable de generador que determina cuantos pacientes generar al principio
+
+	first_run = true
+	mins = array de cantidad_por_hora ints
+	while true then
+		empezo_minuto.acquire()
+		if first_run then
+			first_run = false
+			for i from 0 to pacientes_iniciales do
+				paciente = random.generar_paciente()
+				mutex_colas.lock()
+				planificador.add_paciente(paciente)
+				mutex_colas.unlock()
+			end for
+
+			mins = random.generar_mins_aleatorios()
+
+			for i from 0 to mins.len do
+				if mins[i] == hora_min then
+					paciente = random.generar_paciente()
+					mutex_colas.lock()
+					planificador.add_paciente(paciente)
+					mutex_colas.unlock()
+				end if
+			end for
+
+
+		terminaron_todos.wait()
+		termino_minuto.release()
+	end while
