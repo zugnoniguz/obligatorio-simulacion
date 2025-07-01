@@ -20,8 +20,7 @@ termino_minuto = semaforo(0)
 // una barrera tiene un metodo wait que libera a los hilos si y solo si hay N hilos esperando en el metodo wait
 terminaron_todos = barrera(cant_hilos)
 
-hora_min = 0 // variable que indica el minuto de la hora actual
-hora_hora = 0 // variable que indica la hora de la hora actual
+hora = Hora(0, 0) // variable que indica la hora actual
 
 
 medico:
@@ -47,9 +46,9 @@ medico:
 						enfermero = planificador.conseguir_enfermero()
 						if enfermero == null then
 							if paciente_medico.esEmergencia() then
-								planificador.marcar_para_enfermero(id_medico)
-							else
 								planificador.marcar_para_enfermero_emergencia(id_medico)
+							else
+								planificador.marcar_para_enfermero(id_medico)
 							end if
 						else
 							id_enfermero = enfermero
@@ -73,7 +72,7 @@ medico:
 		end if
 
 		if paciente_medico != null then
-			if ! tengo_enfermero then
+			if id_enfermero != null then
 				mutex_enfermeros.lock()
 				enfermero = planificador.conseguir_enfermero()
 				if enfermero != null then
@@ -93,12 +92,11 @@ medico:
 			if paciente.terminoAtencion() then
 				mutex_salas.lock()
 				planificador.devolver_sala(sala)
-				sala = null
+				id_sala = null
 				mutex_salas.unlock()
 
 				mutex_enfermeros.lock()
 				planificador.devolver_enfermero(id_enfermero)
-				sala = null
 				mutex_enfermeros.unlock()
 			end if
 		end if
@@ -187,12 +185,13 @@ enfermero:
 planificador:
 	init_simulacion()
 
+	hora = 08:00
 	while hora != 20:00 then
 		empezo_minuto.release(cant_hilos)
 
 		termino_minuto.acquire(cant_hilos)
 
-		hora += 1 // aumenta min y hora
+		hora.increment()
 
 		envejecer_pacientes()
 	end while
@@ -308,17 +307,18 @@ generador:
 				planificador.add_paciente(paciente)
 				mutex_colas.unlock()
 			end for
+		end if
 
-			mins = random.generar_mins_aleatorios()
+		mins = random.generar_mins_aleatorios()
 
-			for i from 0 to mins.len do
-				if mins[i] == hora_min then
-					paciente = random.generar_paciente()
-					mutex_colas.lock()
-					planificador.add_paciente(paciente)
-					mutex_colas.unlock()
-				end if
-			end for
+		for i from 0 to mins.len do
+			if mins[i] == hora_min then
+				paciente = random.generar_paciente()
+				mutex_colas.lock()
+				planificador.add_paciente(paciente)
+				mutex_colas.unlock()
+			end if
+		end for
 
 
 		terminaron_todos.wait()
